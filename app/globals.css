@@ -1,0 +1,36 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --color-ink: #111111;
+  --color-muted: #5b5f5d;
+  --color-line: #e6e7e5;
+  --color-surface: #f6f6f4;
+  --color-forest: #1f4d3a;
+  --color-forest-dark: #163a2b;
+  --color-warm: #d97a3a;
+  --color-warm-dark: #c56a2c;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  background: #ffffff;
+  color: var(--color-ink);
+}
+
+/* Set before paint by the inline script in app/layout.tsx so a dismissed banner never flashes. */
+html[data-legal-dismissed] #legal-banner {
+  display: none;
+}
+
+@layer base {
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+}
