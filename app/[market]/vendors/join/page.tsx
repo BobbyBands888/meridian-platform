@@ -59,6 +59,7 @@ export default async function JoinPage({ params }: PageProps<"/[market]/vendors/
             <VendorForm
               mode="join"
               brand={brand}
+              state={market.state}
               serviceAreaExample={countyList({ counties: market.counties.slice(0, 2) })}
               userId={user.id}
               action={joinVendorDirectory}

@@ -8,9 +8,12 @@ import { vendorCategories } from "@/lib/site";
 import { BIO_MAX } from "@/lib/vendors";
 import type { VendorFormState, VendorFormValues } from "./actions";
 
-const certificationsFor = (brand: string) =>
+const certificationsFor = (brand: string, state: string) =>
   [
-    { name: "licensed", label: "I am a licensed professional in my field" },
+    {
+      name: "licensed",
+      label: `I hold any license my field requires in ${state} (photographers, painters, handymen, and stagers usually don't need one)`,
+    },
     { name: "insured", label: "I carry appropriate liability insurance" },
     { name: "understands_connector", label: `I understand ${brand} is a marketplace connector, not a broker` },
     { name: "handles_own_agreements", label: "I handle my own client agreements" },
@@ -20,6 +23,8 @@ const certificationsFor = (brand: string) =>
 type Props = {
   mode: "join" | "edit";
   brand: string;
+  /** The market's state, for the license certification. */
+  state: string;
   userId: string;
   /** Example for the service area hint, like "Davidson and Williamson counties". */
   serviceAreaExample?: string;
@@ -28,8 +33,8 @@ type Props = {
   submitLabel: string;
 };
 
-export function VendorForm({ mode, brand, userId, serviceAreaExample, action, initial, submitLabel }: Props) {
-  const certifications = certificationsFor(brand);
+export function VendorForm({ mode, brand, state: marketState, userId, serviceAreaExample, action, initial, submitLabel }: Props) {
+  const certifications = certificationsFor(brand, marketState);
   const [state, formAction, pending] = useActionState<VendorFormState, FormData>(action, {});
   const values = state.values ?? initial;
   const errors = state.errors ?? {};

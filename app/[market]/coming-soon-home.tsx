@@ -61,7 +61,7 @@ export function ComingSoonHome({ market }: { market: Market }) {
                 ))}
               </ul>
             </div>
-            <PrelaunchVendorSignup brand={brand} marketSlug={market.slug} serviceAreaExample={countyList({ counties: market.counties.slice(0, 2) })} />
+            <PrelaunchVendorSignup brand={brand} state={market.state} marketSlug={market.slug} serviceAreaExample={countyList({ counties: market.counties.slice(0, 2) })} />
           </div>
         </Container>
       </section>

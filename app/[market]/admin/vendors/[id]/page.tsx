@@ -32,7 +32,7 @@ const done: Record<string, string> = {
 };
 
 const certLabels = {
-  licensed: "Licensed professional",
+  licensed: "Holds any license their field requires",
   insured: "Carries liability insurance",
   understands_connector: "Understands the site is a connector, not a broker",
   handles_own_agreements: "Handles own client agreements",

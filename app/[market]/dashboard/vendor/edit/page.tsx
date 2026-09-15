@@ -46,6 +46,7 @@ export default async function EditVendorPage({ params }: PageProps<"/[market]/da
           <VendorForm
             mode="edit"
             brand={brandName(market)}
+            state={market.state}
             serviceAreaExample={countyList({ counties: market.counties.slice(0, 2) })}
             userId={profile.id}
             action={updateVendorProfile}

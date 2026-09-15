@@ -21,7 +21,7 @@ const NEXT = "/#pre-register";
  * visitor's session in the browser: signed-out visitors get a sign-in link that brings them back here, and
  * signed-in visitors get the same form as /vendors/join. The server action re-checks everything.
  */
-export function PrelaunchVendorSignup({ brand, marketSlug, serviceAreaExample }: { brand: string; marketSlug: string; serviceAreaExample: string }) {
+export function PrelaunchVendorSignup({ brand, state: marketState, marketSlug, serviceAreaExample }: { brand: string; state: string; marketSlug: string; serviceAreaExample: string }) {
   const [state, setState] = useState<State>({ kind: "loading" });
 
   useEffect(() => {
@@ -63,6 +63,7 @@ export function PrelaunchVendorSignup({ brand, marketSlug, serviceAreaExample }:
         <VendorForm
           mode="join"
           brand={brand}
+          state={marketState}
           serviceAreaExample={serviceAreaExample}
           userId={state.userId}
           action={joinVendorDirectory}
