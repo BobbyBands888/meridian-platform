@@ -21,6 +21,7 @@ const done: Record<string, string> = {
   rejected: "Rejected. The vendor was emailed.",
   "edit-approved": "Edit approved. The changes are live and the vendor was emailed.",
   "edit-declined": "Edit declined. The vendor was emailed and their current profile is unchanged.",
+  already: "That was already handled, so no email was sent again.",
 };
 
 const certLabels = {

@@ -7,6 +7,7 @@ import type { ListingStatus } from "@/lib/database.types";
 import { formatPrice, listingPath, statusLabels } from "@/lib/listings";
 import { locationLine } from "@/lib/areas";
 import { formatUsPhone } from "@/lib/phone";
+import { getInquiries, getInquiryCounts } from "@/lib/leads";
 import { createClient } from "@/lib/supabase/server";
 import { updateListing } from "@/app/sell/actions";
 import { ListingForm } from "@/app/sell/listing-form";
@@ -32,13 +33,8 @@ export default async function ManageListingPage({ params }: PageProps<"/dashboar
     .maybeSingle();
   if (!listing) notFound();
 
-  // Row-level security limits this to inquiries about the seller's own listing.
-  const { data: leads } = await supabase
-    .from("leads")
-    .select("id, sender_name, sender_email, sender_phone, message, created_at")
-    .eq("type", "listing")
-    .eq("target_id", listing.id)
-    .order("created_at", { ascending: false });
+  // Row-level security limits these to inquiries about the seller's own listing.
+  const [leads, counts] = await Promise.all([getInquiries("listing", listing.id), getInquiryCounts("listing", listing.id)]);
 
   const photos = [...listing.listing_photos].sort((a, b) => a.sort_order - b.sort_order).map((p) => p.url);
   const published = PUBLISHED.includes(listing.status);
@@ -108,14 +104,15 @@ export default async function ManageListingPage({ params }: PageProps<"/dashboar
         <section aria-labelledby="inquiries-heading" className="lg:sticky lg:top-24 lg:self-start">
           <div className="rounded-2xl border border-line p-6">
             <h2 id="inquiries-heading" className="text-2xl font-semibold tracking-tight">
-              Inquiries <span className="text-muted">({leads?.length ?? 0})</span>
+              Inquiries <span className="text-muted">({counts.allTime})</span>
             </h2>
-            {leads?.length ? (
+            {counts.allTime > 0 && <p className="mt-1 text-[14px] text-muted">{counts.last30Days} in the last 30 days</p>}
+            {leads.length ? (
               <ul className="mt-4 space-y-4">
                 {leads.map((lead) => (
                   <li key={lead.id} className="border-t border-line pt-4 first:border-t-0 first:pt-0">
                     <div className="flex items-baseline justify-between gap-3">
-                      <p className="font-semibold">{lead.sender_name}</p>
+                      <p className="min-w-0 break-words font-semibold">{lead.sender_name}</p>
                       <time dateTime={lead.created_at} className="shrink-0 text-[13px] text-muted">
                         {dateFmt.format(new Date(lead.created_at))}
                       </time>

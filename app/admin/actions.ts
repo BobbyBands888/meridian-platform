@@ -13,65 +13,26 @@ async function assertAdmin() {
   if (!profile?.is_admin) throw new Error("Not authorized.");
 }
 
+/** Sends the admin back where the action started (a tab or a detail page) with a result notice. */
+function finish(formData: FormData, fallback: string, done: string): never {
+  const back = String(formData.get("return_to") ?? "");
+  const base = back.startsWith("/admin") && !back.startsWith("//") ? back : fallback;
+  const url = new URL(base, "http://admin.local");
+  url.searchParams.set("done", done);
+  redirect(`${url.pathname}${url.search}`);
+}
+
+const note = (formData: FormData) => String(formData.get("note") ?? "").trim().slice(0, 2000);
+
 async function loadVendor(vendorId: string) {
   const admin = createAdminClient();
-  const { data } = await admin.from("vendors").select("id, business_name, category, status, profiles!inner(email)").eq("id", vendorId).single();
+  const { data } = await admin
+    .from("vendors")
+    .select("id, business_name, category, status, profiles!inner(email), vendor_pending_edits(vendor_id)")
+    .eq("id", vendorId)
+    .single();
   if (!data) throw new Error("Vendor not found.");
   return { admin, vendor: data };
-}
-
-// Every public page that shows vendors reads through the "vendors" cache tag, so expiring it refreshes
-// category lists, profiles, and the sitemap on their next request.
-function revalidateVendor() {
-  updateTag(CACHE_TAGS.vendors);
-}
-
-export async function approveVendor(formData: FormData) {
-  await assertAdmin();
-  const vendorId = String(formData.get("vendor_id"));
-  const { admin, vendor } = await loadVendor(vendorId);
-  const { error } = await admin.from("vendors").update({ status: "approved" }).eq("id", vendorId);
-  if (error) throw new Error(error.message);
-  await sendVendorApproved(vendor.profiles.email, vendor);
-  revalidateVendor();
-  redirect(`/admin/vendors/${vendorId}?done=approved`);
-}
-
-export async function rejectVendor(formData: FormData) {
-  await assertAdmin();
-  const vendorId = String(formData.get("vendor_id"));
-  const note = String(formData.get("note") ?? "").trim().slice(0, 2000);
-  const { admin, vendor } = await loadVendor(vendorId);
-  const { error } = await admin.from("vendors").update({ status: "rejected" }).eq("id", vendorId);
-  if (error) throw new Error(error.message);
-  await admin.from("vendor_pending_edits").delete().eq("vendor_id", vendorId);
-  await sendVendorRejected(vendor.profiles.email, vendor, note);
-  revalidateVendor();
-  redirect(`/admin/vendors/${vendorId}?done=rejected`);
-}
-
-export async function approveVendorEdit(formData: FormData) {
-  await assertAdmin();
-  const vendorId = String(formData.get("vendor_id"));
-  const { admin, vendor } = await loadVendor(vendorId);
-  const { data: applied, error } = await admin.rpc("apply_vendor_edit", { p_vendor_id: vendorId });
-  if (error) throw new Error(error.message);
-  if (applied) {
-    await sendVendorEditApproved(vendor.profiles.email, vendor);
-    revalidateVendor();
-  }
-  redirect(`/admin/vendors/${vendorId}?done=edit-approved`);
-}
-
-export async function declineVendorEdit(formData: FormData) {
-  await assertAdmin();
-  const vendorId = String(formData.get("vendor_id"));
-  const note = String(formData.get("note") ?? "").trim().slice(0, 2000);
-  const { admin, vendor } = await loadVendor(vendorId);
-  const { error } = await admin.from("vendor_pending_edits").delete().eq("vendor_id", vendorId);
-  if (error) throw new Error(error.message);
-  await sendVendorEditDeclined(vendor.profiles.email, vendor, note);
-  redirect(`/admin/vendors/${vendorId}?done=edit-declined`);
 }
 
 async function loadListing(listingId: string) {
@@ -85,26 +46,81 @@ async function loadListing(listingId: string) {
   return { admin, listing: data };
 }
 
+// Every public page that shows vendors or listings reads through these cache tags, so expiring them refreshes
+// lists, detail pages, and the sitemap on their next request.
+const refreshVendors = () => updateTag(CACHE_TAGS.vendors);
+const refreshListings = () => updateTag(CACHE_TAGS.listings);
+
+export async function approveVendor(formData: FormData) {
+  await assertAdmin();
+  const vendorId = String(formData.get("vendor_id"));
+  const { admin, vendor } = await loadVendor(vendorId);
+  // Already handled (a double click, or two admins at once): don't send a second email.
+  if (vendor.status === "approved") finish(formData, `/admin/vendors/${vendorId}`, "already");
+  const { error } = await admin.from("vendors").update({ status: "approved" }).eq("id", vendorId);
+  if (error) throw new Error(error.message);
+  await sendVendorApproved(vendor.profiles.email, vendor);
+  refreshVendors();
+  finish(formData, `/admin/vendors/${vendorId}`, "approved");
+}
+
+export async function rejectVendor(formData: FormData) {
+  await assertAdmin();
+  const vendorId = String(formData.get("vendor_id"));
+  const { admin, vendor } = await loadVendor(vendorId);
+  if (vendor.status === "rejected") finish(formData, `/admin/vendors/${vendorId}`, "already");
+  const { error } = await admin.from("vendors").update({ status: "rejected" }).eq("id", vendorId);
+  if (error) throw new Error(error.message);
+  await admin.from("vendor_pending_edits").delete().eq("vendor_id", vendorId);
+  await sendVendorRejected(vendor.profiles.email, vendor, note(formData));
+  if (vendor.status === "approved") refreshVendors();
+  finish(formData, `/admin/vendors/${vendorId}`, "rejected");
+}
+
+export async function approveVendorEdit(formData: FormData) {
+  await assertAdmin();
+  const vendorId = String(formData.get("vendor_id"));
+  const { admin, vendor } = await loadVendor(vendorId);
+  const { data: applied, error } = await admin.rpc("apply_vendor_edit", { p_vendor_id: vendorId });
+  if (error) throw new Error(error.message);
+  if (!applied) finish(formData, `/admin/vendors/${vendorId}`, "already");
+  await sendVendorEditApproved(vendor.profiles.email, vendor);
+  refreshVendors();
+  finish(formData, `/admin/vendors/${vendorId}`, "edit-approved");
+}
+
+export async function declineVendorEdit(formData: FormData) {
+  await assertAdmin();
+  const vendorId = String(formData.get("vendor_id"));
+  const { admin, vendor } = await loadVendor(vendorId);
+  if (!vendor.vendor_pending_edits) finish(formData, `/admin/vendors/${vendorId}`, "already");
+  const { error } = await admin.from("vendor_pending_edits").delete().eq("vendor_id", vendorId);
+  if (error) throw new Error(error.message);
+  await sendVendorEditDeclined(vendor.profiles.email, vendor, note(formData));
+  finish(formData, `/admin/vendors/${vendorId}`, "edit-declined");
+}
+
 export async function approveListing(formData: FormData) {
   await assertAdmin();
   const listingId = String(formData.get("listing_id"));
   const { admin, listing } = await loadListing(listingId);
+  if (listing.status !== "pending" && listing.status !== "rejected") finish(formData, `/admin/listings/${listingId}`, "already");
   const { error } = await admin.from("listings").update({ status: "active" }).eq("id", listingId);
   if (error) throw new Error(error.message);
   await sendListingApproved(listing.profiles.email, listing);
-  updateTag(CACHE_TAGS.listings);
-  redirect(`/admin/listings/${listingId}?done=approved`);
+  refreshListings();
+  finish(formData, `/admin/listings/${listingId}`, "approved");
 }
 
 export async function rejectListing(formData: FormData) {
   await assertAdmin();
   const listingId = String(formData.get("listing_id"));
-  const note = String(formData.get("note") ?? "").trim().slice(0, 2000);
   const { admin, listing } = await loadListing(listingId);
+  if (listing.status === "rejected") finish(formData, `/admin/listings/${listingId}`, "already");
   const wasPublic = ["active", "under_contract", "sold"].includes(listing.status);
   const { error } = await admin.from("listings").update({ status: "rejected" }).eq("id", listingId);
   if (error) throw new Error(error.message);
-  await sendListingRejected(listing.profiles.email, listing, note);
-  if (wasPublic) updateTag(CACHE_TAGS.listings);
-  redirect(`/admin/listings/${listingId}?done=rejected`);
+  await sendListingRejected(listing.profiles.email, listing, note(formData));
+  if (wasPublic) refreshListings();
+  finish(formData, `/admin/listings/${listingId}`, "rejected");
 }

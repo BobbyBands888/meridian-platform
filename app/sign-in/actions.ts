@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { safeNextPath } from "@/lib/auth";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
+import { verifyTurnstile } from "@/lib/turnstile";
 import { site } from "@/lib/site";
 
 export type SignInState = { status: "idle" | "sent" | "error"; message?: string; email?: string };
@@ -24,6 +25,13 @@ export async function requestMagicLink(_prev: SignInState, formData: FormData): 
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
     return { status: "error", message: "Enter a valid email address.", email };
   }
+  // Turnstile keeps bots from using the form to send sign-in emails to arbitrary addresses.
+  const h = await headers();
+  const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
+  if (!(await verifyTurnstile(String(formData.get("turnstile_token") ?? ""), ip))) {
+    return { status: "error", message: "We couldn't verify you're human. Please try again.", email };
+  }
+
   if (!getSupabaseEnv()) {
     return { status: "error", message: "Sign-in isn't available right now. Please try again later.", email };
   }

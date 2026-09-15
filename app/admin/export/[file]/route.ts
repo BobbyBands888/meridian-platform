@@ -1,0 +1,90 @@
+import { getCurrentProfile } from "@/lib/auth";
+import type { Lead } from "@/lib/database.types";
+import { attachLeadTargets } from "@/lib/leads";
+import { formatUsPhone } from "@/lib/phone";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { categoryByValue } from "@/lib/vendors";
+
+export const dynamic = "force-dynamic";
+
+const PAGE = 1000;
+
+/** Quotes a CSV cell, and neutralizes values a spreadsheet would run as a formula (CSV injection). */
+function cell(value: unknown) {
+  let text = value === null || value === undefined ? "" : String(value);
+  if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
+  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+const toCsv = (header: string[], rows: unknown[][]) => [header, ...rows].map((r) => r.map(cell).join(",")).join("\r\n") + "\r\n";
+
+const chicago = (iso: string | null | undefined) =>
+  iso ? new Date(iso).toLocaleString("en-US", { timeZone: "America/Chicago", hour12: false }).replace(",", "") : "";
+
+async function fetchAll<T>(load: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>) {
+  const rows: T[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await load(from, from + PAGE - 1);
+    if (error) throw new Error(error.message);
+    rows.push(...(data ?? []));
+    if (!data || data.length < PAGE) return rows;
+  }
+}
+
+async function vendorsCsv() {
+  const admin = createAdminClient();
+  const vendors = await fetchAll((from, to) =>
+    admin
+      .from("vendors")
+      .select("*, profiles!inner(full_name, email, phone), vendor_certifications(certified_at), vendor_pending_edits(submitted_at)")
+      .order("created_at")
+      .range(from, to),
+  );
+  const leads = await fetchAll((from, to) => admin.from("leads").select("target_id").eq("type", "vendor").range(from, to));
+  const leadCounts = new Map<string, number>();
+  for (const l of leads) leadCounts.set(l.target_id, (leadCounts.get(l.target_id) ?? 0) + 1);
+
+  const header = [
+    "vendor_id", "business_name", "category", "status", "founding_vendor", "contact_name", "email", "phone",
+    "service_area", "price_range", "website", "leads_all_time", "edit_pending_since", "certified_at", "created_at",
+  ];
+  const rows = vendors.map((v) => [
+    v.id, v.business_name, categoryByValue(v.category).singular, v.status, v.founding_vendor ? "yes" : "no",
+    v.profiles.full_name, v.profiles.email, formatUsPhone(v.profiles.phone), v.service_area, v.price_range, v.website,
+    leadCounts.get(v.id) ?? 0, chicago(v.vendor_pending_edits?.submitted_at), chicago(v.vendor_certifications?.certified_at),
+    chicago(v.created_at),
+  ]);
+  return toCsv(header, rows);
+}
+
+async function leadsCsv() {
+  const admin = createAdminClient();
+  const leads = await fetchAll<Lead>((from, to) => admin.from("leads").select("*").order("created_at", { ascending: false }).range(from, to));
+  const withTargets = await attachLeadTargets(leads);
+  const header = ["lead_id", "created_at", "type", "sent_to", "recipient_email", "sender_name", "sender_email", "sender_phone", "message", "consent", "source_page"];
+  const rows = withTargets.map((l) => [
+    l.id, chicago(l.created_at), l.type, l.targetLabel, l.recipientEmail, l.sender_name, l.sender_email,
+    formatUsPhone(l.sender_phone), l.message, l.consent ? "yes" : "no", l.source,
+  ]);
+  return toCsv(header, rows);
+}
+
+export async function GET(_request: Request, { params }: RouteContext<"/admin/export/[file]">) {
+  const profile = await getCurrentProfile();
+  if (!profile?.is_admin) return new Response("Not found", { status: 404 });
+
+  const { file } = await params;
+  const builders: Record<string, () => Promise<string>> = { "vendors.csv": vendorsCsv, "leads.csv": leadsCsv };
+  const build = builders[file];
+  if (!build) return new Response("Not found", { status: 404 });
+
+  const date = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+  return new Response(`﻿${await build()}`, {
+    headers: {
+      "Content-Type": "text/csv; charset=utf-8",
+      "Content-Disposition": `attachment; filename="nashville-buys-${file.replace(".csv", "")}-${date}.csv"`,
+      "Cache-Control": "private, no-store",
+      "X-Robots-Tag": "noindex",
+    },
+  });
+}

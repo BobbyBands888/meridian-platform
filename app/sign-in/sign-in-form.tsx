@@ -1,11 +1,20 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useCallback, useEffect, useRef, useState } from "react";
+import { Turnstile, type TurnstileHandle } from "@/components/turnstile";
 import { Button } from "@/components/ui";
 import { requestMagicLink, type SignInState } from "./actions";
 
 export function SignInForm({ next }: { next: string }) {
   const [state, formAction, pending] = useActionState<SignInState, FormData>(requestMagicLink, { status: "idle" });
+  const [token, setToken] = useState("");
+  const turnstile = useRef<TurnstileHandle>(null);
+  const onToken = useCallback((t: string) => setToken(t), []);
+
+  // Tokens are single-use: get a fresh one after every failed attempt.
+  useEffect(() => {
+    if (state.status === "error") turnstile.current?.reset();
+  }, [state]);
 
   if (state.status === "sent") {
     return (
@@ -26,6 +35,7 @@ export function SignInForm({ next }: { next: string }) {
   return (
     <form action={formAction} className="mt-8 space-y-4">
       <input type="hidden" name="next" value={next} />
+      <input type="hidden" name="turnstile_token" value={token} />
       <div>
         <label htmlFor="email" className="block text-[15px] font-medium">
           Email
@@ -43,7 +53,8 @@ export function SignInForm({ next }: { next: string }) {
           className="mt-2 min-h-12 w-full rounded-lg border border-ink/20 px-4 text-base focus:border-forest focus:outline-none focus:ring-2 focus:ring-forest/20"
         />
       </div>
-      <Button type="submit" pending={pending} pendingLabel="Sending link" className="sm:w-full">
+      <Turnstile ref={turnstile} onToken={onToken} action="sign-in" />
+      <Button type="submit" pending={pending || !token} pendingLabel={pending ? "Sending link" : "Loading"} className="sm:w-full">
         Email me a sign-in link
       </Button>
       <p id="sign-in-message" role="status" aria-live="polite" className="text-[15px] text-red-700">

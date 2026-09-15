@@ -120,7 +120,9 @@ update public.profiles set is_admin = true where email = 'you@example.com';
 
 ---
 
-## Resend DNS records (Phase 2 for sign-in email, Phase 5 for notifications)
+## Resend DNS records
+
+Sign-in links (sent by Supabase through Resend SMTP) and every notification the site sends (vendor and listing confirmations, approvals, inquiries with reply-to set to the sender, admin copies) come from `hello@nashvillebuys.com`, so the domain must be verified in Resend.
 
 1. **Resend → Domains → Add Domain** → `nashvillebuys.com`, region `us-east-1`.
 2. Resend shows the exact records for your domain. They follow this pattern; copy the values from Resend, especially the DKIM key, which is unique to your account.
@@ -143,7 +145,7 @@ To receive replies at `hello@nashvillebuys.com`, you also need an inbox for it (
 
 ## Cloudflare Turnstile (Phase 3)
 
-Protects the contact forms on vendor profiles and listings.
+Protects every public form: sign-in and the contact forms on vendor profiles and listings. The site verifies tokens itself, so leave Supabase's own CAPTCHA setting (Authentication → Attack Protection) off.
 
 1. **Cloudflare dashboard → Turnstile → Add widget**
    - Widget name: `Nashville Buys`
@@ -152,6 +154,11 @@ Protects the contact forms on vendor profiles and listings.
 2. Copy the **Site Key** to `NEXT_PUBLIC_TURNSTILE_SITE_KEY` and the **Secret Key** to `TURNSTILE_SECRET_KEY`.
 
 For local development, use Cloudflare's test keys so forms work on localhost: site key `1x00000000000000000000AA` and secret `1x0000000000000000000000000000000AA` (always passes). The secret `2x0000000000000000000000000000000AA` always fails, which is useful for checking that blocked submissions are rejected.
+
+## Admin
+
+- `/admin` has three tabs: **Pending Vendors** (new applications and edits to live profiles), **Pending Listings**, and **All Leads**. Approve and reject buttons send the matching email. Open a row's Review page to add a note to a rejection.
+- **Export vendors (CSV)** and **Export leads (CSV)** download everything, including contact details. Treat the files as private.
 
 ## Vercel
 

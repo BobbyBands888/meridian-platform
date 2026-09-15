@@ -21,6 +21,7 @@ export const metadata: Metadata = {
 const done: Record<string, string> = {
   approved: "Approved. The listing is live and the seller was emailed.",
   rejected: "Rejected. The seller was emailed.",
+  already: "That was already handled, so no email was sent again.",
 };
 
 export default async function AdminListingPage({ params, searchParams }: PageProps<"/admin/listings/[id]">) {

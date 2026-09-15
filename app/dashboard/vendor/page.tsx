@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { Check } from "@/components/photo-card";
 import { ButtonLink, Container } from "@/components/ui";
 import { requireProfile } from "@/lib/auth";
+import { getInquiries, getInquiryCounts } from "@/lib/leads";
+import { formatUsPhone } from "@/lib/phone";
 import { createClient } from "@/lib/supabase/server";
 import { categoryByValue, vendorPath } from "@/lib/vendors";
 
@@ -12,6 +14,8 @@ export const metadata: Metadata = {
   title: "Vendor dashboard",
   robots: { index: false },
 };
+
+const inquiryDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/Chicago" });
 
 const notices: Record<string, string> = {
   submitted: "Received — you'll be live within 24 hours. We sent a confirmation to your email.",
@@ -28,7 +32,11 @@ export default async function VendorDashboardPage({ searchParams }: PageProps<"/
   const supabase = await createClient();
   const { data: vendor } = await supabase.from("vendors").select("*").eq("profile_id", profile.id).maybeSingle();
   if (!vendor) redirect("/vendors/join");
-  const { data: pending } = await supabase.from("vendor_pending_edits").select("*").eq("vendor_id", vendor.id).maybeSingle();
+  const [{ data: pending }, counts, inquiries] = await Promise.all([
+    supabase.from("vendor_pending_edits").select("*").eq("vendor_id", vendor.id).maybeSingle(),
+    getInquiryCounts("vendor", vendor.id),
+    getInquiries("vendor", vendor.id),
+  ]);
 
   const category = categoryByValue(vendor.category);
 
@@ -45,7 +53,59 @@ export default async function VendorDashboardPage({ searchParams }: PageProps<"/
         </p>
       )}
 
-      <div className="mt-8 grid gap-6 lg:grid-cols-3">
+      <section aria-labelledby="inquiries-heading" className="mt-8 rounded-2xl border border-line p-6">
+        <h2 id="inquiries-heading" className="text-2xl font-semibold tracking-tight">
+          You&apos;ve received {counts.allTime.toLocaleString("en-US")} {counts.allTime === 1 ? "inquiry" : "inquiries"} through Nashville Buys.
+        </h2>
+        <dl className="mt-4 grid max-w-md grid-cols-2 gap-3">
+          <div className="rounded-xl bg-surface p-4">
+            <dt className="text-[14px] text-muted">All time</dt>
+            <dd className="mt-1 text-3xl font-bold tracking-tight">{counts.allTime.toLocaleString("en-US")}</dd>
+          </div>
+          <div className="rounded-xl bg-surface p-4">
+            <dt className="text-[14px] text-muted">Last 30 days</dt>
+            <dd className="mt-1 text-3xl font-bold tracking-tight">{counts.last30Days.toLocaleString("en-US")}</dd>
+          </div>
+        </dl>
+
+        {inquiries.length > 0 ? (
+          <ul className="mt-6 divide-y divide-line border-t border-line">
+            {inquiries.map((lead) => (
+              <li key={lead.id} className="py-4">
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
+                  <p className="min-w-0 break-words font-semibold">{lead.sender_name}</p>
+                  <time dateTime={lead.created_at} className="shrink-0 text-[13px] text-muted">
+                    {inquiryDate.format(new Date(lead.created_at))}
+                  </time>
+                </div>
+                <p className="mt-1 whitespace-pre-line text-[15px] leading-relaxed">{lead.message}</p>
+                <p className="mt-2 break-words text-[14px]">
+                  <a href={`mailto:${lead.sender_email}`} className="text-forest underline underline-offset-2">
+                    {lead.sender_email}
+                  </a>
+                  {lead.sender_phone && (
+                    <>
+                      {" · "}
+                      <a href={`tel:${lead.sender_phone}`} className="text-forest underline underline-offset-2">
+                        {formatUsPhone(lead.sender_phone)}
+                      </a>
+                    </>
+                  )}
+                </p>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-4 text-[15px] leading-relaxed text-muted">
+            {vendor.status === "approved"
+              ? "No inquiries yet. When someone contacts you from your profile, it arrives by email and shows up here."
+              : "Inquiries will show up here once your profile is live."}
+          </p>
+        )}
+        {inquiries.length >= 100 && <p className="mt-3 text-[13px] text-muted">Showing your 100 most recent inquiries.</p>}
+      </section>
+
+      <div className="mt-6 grid gap-6 lg:grid-cols-3">
         <section aria-labelledby="status-heading" className="rounded-2xl border border-line p-6">
           <h2 id="status-heading" className="text-lg font-semibold tracking-tight">
             Status
