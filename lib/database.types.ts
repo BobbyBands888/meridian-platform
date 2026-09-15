@@ -1,0 +1,164 @@
+// Types for the schema in supabase/migrations. Keep in sync when the migration changes.
+// (Generated-style shape so it can be swapped for `supabase gen types typescript` output later.)
+
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
+
+export type UserRole = "buyer" | "seller" | "vendor";
+export type VendorCategoryValue = "attorney" | "home_inspector" | "photographer" | "painter" | "handyman" | "lender";
+export type VendorStatus = "pending" | "approved" | "rejected";
+export type ListingStatus = "pending" | "active" | "under_contract" | "sold" | "rejected";
+export type LeadType = "listing" | "vendor";
+
+type ProfileRow = {
+  id: string;
+  email: string;
+  phone: string | null;
+  phone_verified: boolean;
+  full_name: string | null;
+  roles: UserRole[];
+  is_admin: boolean;
+  created_at: string;
+};
+
+type VendorRow = {
+  id: string;
+  profile_id: string;
+  category: VendorCategoryValue;
+  business_name: string;
+  headshot_url: string;
+  bio: string;
+  service_area: string;
+  price_range: string;
+  website: string | null;
+  status: VendorStatus;
+  founding_vendor: boolean;
+  created_at: string;
+};
+
+type ListingRow = {
+  id: string;
+  seller_id: string;
+  street: string;
+  city: string;
+  zip: string;
+  hide_exact_address: boolean;
+  price: number;
+  beds: number;
+  baths: number;
+  sqft: number | null;
+  description: string;
+  status: ListingStatus;
+  slug: string;
+  created_at: string;
+  updated_at: string;
+};
+
+type ListingPhotoRow = { id: string; listing_id: string; url: string; sort_order: number };
+
+type LeadRow = {
+  id: string;
+  type: LeadType;
+  target_id: string;
+  sender_name: string;
+  sender_email: string;
+  sender_phone: string | null;
+  message: string;
+  consent: boolean;
+  source: string | null;
+  created_at: string;
+};
+
+type VendorCertificationRow = {
+  vendor_id: string;
+  licensed: boolean;
+  insured: boolean;
+  understands_connector: boolean;
+  handles_own_agreements: boolean;
+  read_terms: boolean;
+  certified_at: string;
+};
+
+export type Database = {
+  public: {
+    Tables: {
+      profiles: {
+        Row: ProfileRow;
+        Insert: Partial<ProfileRow> & Pick<ProfileRow, "id" | "email">;
+        Update: Partial<ProfileRow>;
+        Relationships: [];
+      };
+      vendors: {
+        Row: VendorRow;
+        Insert: Omit<VendorRow, "id" | "status" | "founding_vendor" | "created_at" | "website"> &
+          Partial<Pick<VendorRow, "id" | "status" | "founding_vendor" | "created_at" | "website">>;
+        Update: Partial<VendorRow>;
+        Relationships: [
+          { foreignKeyName: "vendors_profile_id_fkey"; columns: ["profile_id"]; isOneToOne: true; referencedRelation: "profiles"; referencedColumns: ["id"] },
+        ];
+      };
+      listings: {
+        Row: ListingRow;
+        Insert: Omit<ListingRow, "id" | "city" | "hide_exact_address" | "sqft" | "status" | "slug" | "created_at" | "updated_at"> &
+          Partial<Pick<ListingRow, "id" | "city" | "hide_exact_address" | "sqft" | "status" | "slug" | "created_at" | "updated_at">>;
+        Update: Partial<ListingRow>;
+        Relationships: [
+          { foreignKeyName: "listings_seller_id_fkey"; columns: ["seller_id"]; isOneToOne: false; referencedRelation: "profiles"; referencedColumns: ["id"] },
+        ];
+      };
+      listing_photos: {
+        Row: ListingPhotoRow;
+        Insert: Omit<ListingPhotoRow, "id" | "sort_order"> & Partial<Pick<ListingPhotoRow, "id" | "sort_order">>;
+        Update: Partial<ListingPhotoRow>;
+        Relationships: [
+          { foreignKeyName: "listing_photos_listing_id_fkey"; columns: ["listing_id"]; isOneToOne: false; referencedRelation: "listings"; referencedColumns: ["id"] },
+        ];
+      };
+      leads: {
+        Row: LeadRow;
+        Insert: Omit<LeadRow, "id" | "created_at" | "sender_phone" | "source"> &
+          Partial<Pick<LeadRow, "id" | "created_at" | "sender_phone" | "source">>;
+        Update: Partial<LeadRow>;
+        Relationships: [];
+      };
+      vendor_certifications: {
+        Row: VendorCertificationRow;
+        Insert: Omit<VendorCertificationRow, "certified_at"> & Partial<Pick<VendorCertificationRow, "certified_at">>;
+        Update: Partial<VendorCertificationRow>;
+        Relationships: [
+          { foreignKeyName: "vendor_certifications_vendor_id_fkey"; columns: ["vendor_id"]; isOneToOne: true; referencedRelation: "vendors"; referencedColumns: ["id"] },
+        ];
+      };
+    };
+    Views: {
+      public_vendors: {
+        Row: Omit<VendorRow, "profile_id" | "status">;
+        Relationships: [];
+      };
+      public_listings: {
+        Row: Omit<ListingRow, "seller_id" | "street"> & { street: string | null };
+        Relationships: [];
+      };
+      public_listing_photos: {
+        Row: ListingPhotoRow;
+        Relationships: [];
+      };
+    };
+    Functions: {
+      is_admin: { Args: Record<PropertyKey, never>; Returns: boolean };
+    };
+    Enums: {
+      user_role: UserRole;
+      vendor_category: VendorCategoryValue;
+      vendor_status: VendorStatus;
+      listing_status: ListingStatus;
+      lead_type: LeadType;
+    };
+    CompositeTypes: Record<string, never>;
+  };
+};
+
+export type Profile = ProfileRow;
+export type Vendor = VendorRow;
+export type Listing = ListingRow;
+export type ListingPhoto = ListingPhotoRow;
+export type Lead = LeadRow;

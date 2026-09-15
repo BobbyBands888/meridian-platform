@@ -2,11 +2,19 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { navLinks, site } from "@/lib/site";
+
+// @supabase/ssr stores the session in readable sb-<ref>-auth-token cookies. Checking for one avoids shipping
+// the Supabase client on every public page; account pages verify the session on the server.
+const hasSessionCookie = () => /(?:^|;\s*)sb-[^=]+-auth-token(?:\.0)?=/.test(document.cookie);
+const noopSubscribe = () => () => {};
 
 export function SiteHeader() {
   const pathname = usePathname();
+  // Re-read on every render; route changes re-render the header, which picks up sign-in and sign-out.
+  const signedIn = useSyncExternalStore(noopSubscribe, hasSessionCookie, () => false);
+  const account = signedIn ? { href: "/dashboard", label: "Account" } : { href: "/sign-in", label: "Sign in" };
   // The menu belongs to the page it was opened on, so navigating closes it.
   const [openOn, setOpenOn] = useState<string | null>(null);
   const open = openOn === pathname;
@@ -37,10 +45,10 @@ export function SiteHeader() {
             </Link>
           ))}
           <Link
-            href="/sign-in"
+            href={account.href}
             className="rounded-lg border border-ink/15 px-4 py-2 text-[15px] font-medium transition-colors hover:border-forest hover:text-forest"
           >
-            Sign in
+            {account.label}
           </Link>
         </nav>
 
@@ -75,11 +83,11 @@ export function SiteHeader() {
             ))}
           </ul>
           <Link
-            href="/sign-in"
+            href={account.href}
             onClick={() => setOpenOn(null)}
             className="mt-4 block w-full rounded-lg border border-ink/15 py-3 text-center text-base font-medium"
           >
-            Sign in
+            {account.label}
           </Link>
         </nav>
       )}
