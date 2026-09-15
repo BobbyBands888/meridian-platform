@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Fragment } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { buttonClass, ButtonLink, Container } from "@/components/ui";
@@ -7,6 +8,7 @@ import type { ListingStatus } from "@/lib/database.types";
 import { formatPrice, listingPath, statusLabels } from "@/lib/listings";
 import { locationLine } from "@/lib/areas";
 import { formatUsPhone } from "@/lib/phone";
+import { INTEREST_DISCLAIMER, interestRows, readInterestDetails } from "@/lib/interest";
 import { getInquiries, getInquiryCounts } from "@/lib/leads";
 import { getDisclosureGuidePath } from "@/lib/guides";
 import { requireMarket } from "@/lib/market-data";
@@ -36,8 +38,13 @@ export default async function ManageListingPage({ params }: PageProps<"/[market]
     .maybeSingle();
   if (!listing) notFound();
 
-  // Row-level security limits these to inquiries about the seller's own listing.
-  const [leads, counts] = await Promise.all([getInquiries("listing", listing.id), getInquiryCounts("listing", listing.id)]);
+  // Row-level security limits these to inquiries about the seller's own listing. Plain messages and expressions
+  // of interest are different enough to read separately.
+  const [leads, counts, interest] = await Promise.all([
+    getInquiries("listing", listing.id),
+    getInquiryCounts("listing", listing.id),
+    getInquiries("interest", listing.id),
+  ]);
 
   const photos = [...listing.listing_photos].sort((a, b) => a.sort_order - b.sort_order).map((p) => p.url);
   const published = PUBLISHED.includes(listing.status);
@@ -129,9 +136,57 @@ export default async function ManageListingPage({ params }: PageProps<"/[market]
             </section>
           )}
 
+          {interest.length > 0 && (
+            <section aria-labelledby="interest-heading" className="rounded-2xl border border-forest/25 bg-forest/[0.03] p-6">
+              <h2 id="interest-heading" className="text-2xl font-semibold tracking-tight">
+                Expressions of interest <span className="text-muted">({interest.length})</span>
+              </h2>
+              <p className="mt-1 text-[13px] leading-relaxed text-muted">{INTEREST_DISCLAIMER}</p>
+              <ul className="mt-4 space-y-5">
+                {interest.map((lead) => {
+                  const details = readInterestDetails(lead.details);
+                  return (
+                    <li key={lead.id} className="border-t border-forest/15 pt-4 first:border-t-0 first:pt-0">
+                      <div className="flex items-baseline justify-between gap-3">
+                        <p className="min-w-0 break-words font-semibold">{lead.sender_name}</p>
+                        <time dateTime={lead.created_at} className="shrink-0 text-[13px] text-muted">
+                          {dateFmt.format(new Date(lead.created_at))}
+                        </time>
+                      </div>
+                      {details && (
+                        <dl className="mt-2 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-[15px]">
+                          {interestRows(details).map(([label, value]) => (
+                            <Fragment key={label}>
+                              <dt className="text-muted">{label}</dt>
+                              <dd className={label === "Amount" ? "font-semibold" : undefined}>{value}</dd>
+                            </Fragment>
+                          ))}
+                        </dl>
+                      )}
+                      <p className="mt-2 whitespace-pre-line text-[15px] leading-relaxed">{lead.message}</p>
+                      <p className="mt-2 text-[14px]">
+                        <a href={`mailto:${lead.sender_email}`} className="text-forest underline underline-offset-2">
+                          {lead.sender_email}
+                        </a>
+                        {lead.sender_phone && (
+                          <>
+                            {" · "}
+                            <a href={`tel:${lead.sender_phone}`} className="text-forest underline underline-offset-2">
+                              {formatUsPhone(lead.sender_phone)}
+                            </a>
+                          </>
+                        )}
+                      </p>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
+
           <section aria-labelledby="inquiries-heading" className="rounded-2xl border border-line p-6">
             <h2 id="inquiries-heading" className="text-2xl font-semibold tracking-tight">
-              Inquiries <span className="text-muted">({counts.allTime})</span>
+              Messages <span className="text-muted">({counts.allTime})</span>
             </h2>
             {counts.allTime > 0 && <p className="mt-1 text-[14px] text-muted">{counts.last30Days} in the last 30 days</p>}
             {leads.length ? (

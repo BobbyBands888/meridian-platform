@@ -5,6 +5,7 @@ import { Container, EmptyState } from "@/components/ui";
 import { locationLine } from "@/lib/areas";
 import { requireAdmin } from "@/lib/auth";
 import type { Lead } from "@/lib/database.types";
+import { interestRows, readInterestDetails } from "@/lib/interest";
 import { attachLeadTargets } from "@/lib/leads";
 import { formatPrice } from "@/lib/listings";
 import { getMarkets, requireMarket } from "@/lib/market-data";
@@ -57,6 +58,9 @@ function MarketBadge({ market }: { market: Market | undefined }) {
 
 const dateFmt = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/Chicago" });
 
+const leadKindLabel = (type: Lead["type"]) =>
+  type === "vendor" ? "Vendor inquiry" : type === "interest" ? "Expression of interest" : "Listing inquiry";
+
 export default async function AdminPage({ params: routeParams, searchParams }: PageProps<"/[market]/admin">) {
   const siteMarket = await requireMarket((await routeParams).market);
   await requireAdmin("/admin");
@@ -70,7 +74,7 @@ export default async function AdminPage({ params: routeParams, searchParams }: P
   const scoped = <Q extends { eq: (column: string, value: string) => Q }>(query: Q, column = "market_id") => (scope.market ? query.eq(column, scope.market.id) : query);
   const tab: Tab = TABS.some((t) => t.key === params.tab) ? (params.tab as Tab) : "vendors";
   const page = Math.max(1, Number(params.page) || 1);
-  const leadType = params.type === "vendor" || params.type === "listing" ? params.type : undefined;
+  const leadType = params.type === "vendor" || params.type === "listing" || params.type === "interest" ? params.type : undefined;
   const notice = notices[String(params.done ?? "")];
 
   const admin = createAdminClient();
@@ -341,6 +345,7 @@ async function AllLeads({ scope, marketsById, page, type }: TabProps & { page: n
         {[
           { key: undefined, label: "All" },
           { key: "listing" as const, label: "Listings" },
+          { key: "interest" as const, label: "Interest" },
           { key: "vendor" as const, label: "Vendors" },
         ].map((f) => (
           <Link
@@ -376,9 +381,19 @@ async function AllLeads({ scope, marketsById, page, type }: TabProps & { page: n
                   {dateFmt.format(new Date(lead.created_at))}
                 </time>
               </div>
+              {(() => {
+                const details = readInterestDetails(lead.details);
+                return details ? (
+                  <p className="mt-1 text-[15px]">
+                    {interestRows(details)
+                      .map(([label, value]) => `${label}: ${value}`)
+                      .join(" · ")}
+                  </p>
+                ) : null;
+              })()}
               <p className="mt-1 whitespace-pre-line text-[15px] leading-relaxed">{lead.message}</p>
               <p className="mt-2 break-words text-[13px] text-muted">
-                {lead.type === "vendor" ? "Vendor" : "Listing"} inquiry · from {lead.sender_email}
+                {leadKindLabel(lead.type)} · from {lead.sender_email}
                 {lead.sender_phone ? ` · ${formatUsPhone(lead.sender_phone)}` : ""}
                 {lead.recipientEmail ? ` · sent to ${lead.recipientEmail}` : ""}
               </p>

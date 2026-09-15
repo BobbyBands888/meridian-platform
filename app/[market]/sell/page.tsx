@@ -66,6 +66,7 @@ export default async function SellPage({ params }: PageProps<"/[market]/sell">) 
               userId={user.id}
               action={createListing}
               submitLabel="Submit listing for review"
+              draftId={crypto.randomUUID()}
               initial={{ street: "", zip: "", hide_exact_address: false, price: "", beds: "", baths: "", sqft: "", description: "", photo_urls: [] }}
             />
             <p className="mt-6 text-[13px] leading-relaxed text-muted">

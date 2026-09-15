@@ -26,6 +26,7 @@ Set these in `.env.local` for local development, and in **Vercel → Project →
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Cloudflare → Turnstile → your widget → Site Key | Yes |
 | `TURNSTILE_SECRET_KEY` | Cloudflare → Turnstile → your widget → Secret Key | **No, server only** |
 | `ADMIN_EMAIL` | The address that receives approval requests, lead copies, the morning digest, and replies to the day-14 vendor email | No |
+| `ANTHROPIC_API_KEY` | https://console.anthropic.com → API Keys → Create Key. Powers **Write it for me** on the sell form. Without it the button says the feature isn't available; nothing else changes | **No, server only** |
 | `CRON_SECRET` | Any long random string you make up (for example `openssl rand -hex 32`). Vercel sends it to the daily job so nobody else can trigger it | **No, server only** |
 | `FACEBOOK_PAGE_TOKEN_NASHVILLE` (one per market: `FACEBOOK_PAGE_TOKEN_TAMPA`, `FACEBOOK_PAGE_TOKEN_ORLANDO`, ...) | A Facebook Page access token; see **Facebook Page posting**. Optional: a market without one just isn't posted to Facebook | **No, server only** |
 

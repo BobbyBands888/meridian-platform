@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ContactForm } from "@/components/contact-form";
 import { areaBySlug } from "@/lib/areas";
+import { ListingContact } from "@/components/listing-contact";
+import { CardGrid } from "@/components/photo-card";
+import { VendorCard } from "@/components/vendor-card";
 import { Check } from "@/components/photo-card";
 import { Container } from "@/components/ui";
 import { getDisclosureGuidePath } from "@/lib/guides";
@@ -10,6 +12,8 @@ import { formatPrice, formatSpecs, listingLocation, listingPath, listingSummary,
 import { requireMarket } from "@/lib/market-data";
 import { brandName } from "@/lib/markets";
 import { getPublicListing } from "@/lib/public-listings";
+import { closeDateRange } from "@/lib/interest";
+import { getVendorsInCategory } from "@/lib/public-vendors";
 import { AreaPage, areaMetadata } from "./area-page";
 import { ListingGallery } from "./listing-gallery";
 
@@ -53,11 +57,17 @@ export default async function ListingPage({ params }: PageProps<"/[market]/homes
   const area = areaBySlug(market, slug);
   if (area) return <AreaPage market={market} area={area} />;
 
-  const [result, disclosureGuide] = await Promise.all([getPublicListing(market.id, slug), getDisclosureGuidePath(market.slug)]);
+  const [result, disclosureGuide, lenders] = await Promise.all([
+    getPublicListing(market.id, slug),
+    getDisclosureGuidePath(market.slug),
+    // For a buyer who says they aren't pre-approved yet, on the interest form's confirmation.
+    getVendorsInCategory(market.id, "lender", 2).catch(() => []),
+  ]);
   if (!result) notFound(); // The layout already 404s; this narrows the type.
   const { listing, photos } = result;
   const location = listingLocation(market, listing);
   const isActive = listing.status === "active";
+  const closeRange = closeDateRange();
 
   return (
     <Container className="py-6 sm:py-10">
@@ -140,10 +150,22 @@ export default async function ListingPage({ params }: PageProps<"/[market]/homes
               {isActive ? "Contact the seller" : `This home is ${statusLabels[listing.status].toLowerCase()}`}
             </h2>
             {isActive ? (
-              <>
-                <p className="mb-6 mt-2 text-[15px] text-muted">Your message goes straight to the owner. They&apos;ll reply by email.</p>
-                <ContactForm type="listing" targetId={listing.id} recipientLabel="the seller" brand={brandName(market)} />
-              </>
+              <div className="mt-5">
+                <ListingContact
+                  listingId={listing.id}
+                  brand={brandName(market)}
+                  closeRange={closeRange}
+                  lenderCards={
+                    lenders.length > 0 ? (
+                      <CardGrid>
+                        {lenders.map((vendor) => (
+                          <VendorCard key={vendor.id} market={market} vendor={vendor} />
+                        ))}
+                      </CardGrid>
+                    ) : null
+                  }
+                />
+              </div>
             ) : (
               <p className="mt-2 text-[15px] leading-relaxed text-muted">
                 The seller isn&apos;t taking new inquiries.{" "}

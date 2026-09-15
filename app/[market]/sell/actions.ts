@@ -10,6 +10,7 @@ import { DESCRIPTION_MAX, DESCRIPTION_MIN, LISTING_PHOTO_MAX } from "@/lib/listi
 import { cityForZip, isServiceZip } from "@/lib/areas";
 import { getMarketById, getRequestMarket } from "@/lib/market-data";
 import { countyList, isLive } from "@/lib/markets";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { CACHE_TAGS } from "@/lib/supabase/public";
 import { createClient } from "@/lib/supabase/server";
 
@@ -74,6 +75,23 @@ function validateShared(values: ListingFormValues, userId: string) {
   return { errors, price, fairHousing };
 }
 
+const DRAFT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * "Write it for me" runs are logged before a listing exists, against the draft id the form carries. Once the
+ * listing is created, point those rows at it so cost can be totalled per listing.
+ */
+async function attachAiUsage(draftId: string, profileId: string, listingId: string) {
+  if (!DRAFT_ID.test(draftId)) return;
+  const { error } = await createAdminClient()
+    .from("listing_ai_usage")
+    .update({ listing_id: listingId })
+    .eq("draft_id", draftId)
+    .eq("profile_id", profileId)
+    .is("listing_id", null);
+  if (error) console.error("ai usage attach failed", error.code, error.message);
+}
+
 export async function createListing(_prev: ListingFormState, formData: FormData): Promise<ListingFormState> {
   const user = await getCurrentUser();
   if (!user) redirect("/sign-in?next=/sell");
@@ -133,7 +151,11 @@ export async function createListing(_prev: ListingFormState, formData: FormData)
     price,
   };
   const email = (await getCurrentProfile())?.email ?? user.email;
-  await Promise.all([sendListingReceived(market, email, listing), sendAdminNewListing(market, listing, email)]);
+  await Promise.all([
+    sendListingReceived(market, email, listing),
+    sendAdminNewListing(market, listing, email),
+    attachAiUsage(String(formData.get("draft_id") ?? ""), user.id, created.id),
+  ]);
 
   redirect("/sell/checklist?submitted=1");
 }

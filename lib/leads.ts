@@ -20,7 +20,7 @@ export async function getInquiries(type: Lead["type"], targetId: string, limit =
   const supabase = await createClient();
   const { data } = await supabase
     .from("leads")
-    .select("id, sender_name, sender_email, sender_phone, message, created_at")
+    .select("id, sender_name, sender_email, sender_phone, message, details, created_at")
     .eq("type", type)
     .eq("target_id", targetId)
     .order("created_at", { ascending: false })
@@ -35,7 +35,8 @@ export async function attachLeadTargets(leads: Lead[]): Promise<LeadWithTarget[]
   const admin = createAdminClient();
   const markets = new Map((await getMarkets()).map((m) => [m.id, m]));
   const vendorIds = [...new Set(leads.filter((l) => l.type === "vendor").map((l) => l.target_id))];
-  const listingIds = [...new Set(leads.filter((l) => l.type === "listing").map((l) => l.target_id))];
+  // Plain messages and expressions of interest both point at a listing.
+  const listingIds = [...new Set(leads.filter((l) => l.type !== "vendor").map((l) => l.target_id))];
 
   const [{ data: vendors }, { data: listings }] = await Promise.all([
     vendorIds.length

@@ -17,7 +17,8 @@ export type VendorCategoryValue =
   | "home_insurance";
 export type VendorStatus = "pending" | "approved" | "rejected";
 export type ListingStatus = "pending" | "active" | "under_contract" | "sold" | "rejected";
-export type LeadType = "listing" | "vendor";
+/** "interest" is an expression of interest on a listing: a lead with structured details attached. */
+export type LeadType = "listing" | "vendor" | "interest";
 
 type ProfileRow = {
   id: string;
@@ -27,6 +28,8 @@ type ProfileRow = {
   full_name: string | null;
   roles: UserRole[];
   is_admin: boolean;
+  /** The market whose site this account signed up on; null for accounts created before markets existed. */
+  market_id: string | null;
   created_at: string;
 };
 
@@ -103,6 +106,8 @@ type LeadRow = {
   message: string;
   consent: boolean;
   source: string | null;
+  /** Structured fields for an "interest" lead (see lib/interest.ts); null for other types. */
+  details: Json | null;
   market_id: string;
   created_at: string;
 };
@@ -161,6 +166,44 @@ type ListingSyndicationRow = {
   updated_at: string;
 };
 
+type CourseSignupRow = {
+  id: string;
+  email: string;
+  market_id: string;
+  /** The next lesson to send, 1 through 7; 8 once the course is finished. */
+  next_day: number;
+  unsubscribe_token: string;
+  source: string | null;
+  created_at: string;
+  last_sent_at: string | null;
+  completed_at: string | null;
+  unsubscribed_at: string | null;
+};
+
+type CourseEmailRow = {
+  id: string;
+  signup_id: string;
+  day: number;
+  status: "sending" | "sent" | "skipped" | "failed";
+  resend_id: string | null;
+  error: string | null;
+  created_at: string;
+  sent_at: string | null;
+};
+
+type ListingAiUsageRow = {
+  id: string;
+  draft_id: string;
+  profile_id: string;
+  market_id: string;
+  listing_id: string | null;
+  model: string;
+  input_tokens: number;
+  output_tokens: number;
+  variants: number;
+  created_at: string;
+};
+
 type SignInLinkRequestRow = { id: number; email: string; created_at: string };
 
 type VendorCertificationRow = {
@@ -207,6 +250,28 @@ export type Database = {
           { foreignKeyName: "listing_syndication_listing_id_fkey"; columns: ["listing_id"]; isOneToOne: false; referencedRelation: "listings"; referencedColumns: ["id"] },
         ];
       };
+      course_signups: {
+        Row: CourseSignupRow;
+        Insert: Pick<CourseSignupRow, "email" | "market_id"> & Partial<CourseSignupRow>;
+        Update: Partial<CourseSignupRow>;
+        Relationships: [];
+      };
+      course_emails: {
+        Row: CourseEmailRow;
+        Insert: Pick<CourseEmailRow, "signup_id" | "day" | "status"> & Partial<CourseEmailRow>;
+        Update: Partial<CourseEmailRow>;
+        Relationships: [
+          { foreignKeyName: "course_emails_signup_id_fkey"; columns: ["signup_id"]; isOneToOne: false; referencedRelation: "course_signups"; referencedColumns: ["id"] },
+        ];
+      };
+      listing_ai_usage: {
+        Row: ListingAiUsageRow;
+        Insert: Pick<ListingAiUsageRow, "draft_id" | "profile_id" | "market_id" | "model"> & Partial<ListingAiUsageRow>;
+        Update: Partial<ListingAiUsageRow>;
+        Relationships: [
+          { foreignKeyName: "listing_ai_usage_listing_id_fkey"; columns: ["listing_id"]; isOneToOne: false; referencedRelation: "listings"; referencedColumns: ["id"] },
+        ];
+      };
       sign_in_link_requests: {
         Row: SignInLinkRequestRow;
         Insert: Pick<SignInLinkRequestRow, "email">;
@@ -249,8 +314,8 @@ export type Database = {
       };
       leads: {
         Row: LeadRow;
-        Insert: Omit<LeadRow, "id" | "created_at" | "sender_phone" | "source"> &
-          Partial<Pick<LeadRow, "id" | "created_at" | "sender_phone" | "source">>;
+        Insert: Omit<LeadRow, "id" | "created_at" | "sender_phone" | "source" | "details"> &
+          Partial<Pick<LeadRow, "id" | "created_at" | "sender_phone" | "source" | "details">>;
         Update: Partial<LeadRow>;
         Relationships: [];
       };
@@ -364,3 +429,4 @@ export type ListingPhoto = ListingPhotoRow;
 export type PublicListing = Database["public"]["Views"]["public_listings"]["Row"];
 export type ListingAlert = ListingAlertRow;
 export type Lead = LeadRow;
+export type CourseSignup = CourseSignupRow;

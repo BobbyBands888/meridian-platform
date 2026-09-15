@@ -9,6 +9,7 @@ import { checkFairHousing, type FairHousingIssue } from "@/lib/fair-housing";
 import { DESCRIPTION_MAX, statusLabels } from "@/lib/listings";
 import type { ZipGroup } from "@/lib/areas";
 import type { ListingFormState, ListingFormValues } from "./actions";
+import { DescriptionAssistant } from "./description-assistant";
 
 type Props = {
   mode: "create" | "edit";
@@ -16,6 +17,8 @@ type Props = {
   listingId?: string;
   action: (state: ListingFormState, formData: FormData) => Promise<ListingFormState>;
   initial: ListingFormValues;
+  /** A fresh id for this draft, so AI description runs can be matched to the listing once it's submitted. */
+  draftId?: string;
   /** Statuses a seller can switch between; empty while the listing is in review. */
   statusOptions?: ListingStatus[];
   submitLabel: string;
@@ -25,12 +28,13 @@ type Props = {
   disclosureGuidePath: string | null;
 };
 
-export function ListingForm({ mode, userId, listingId, action, initial, statusOptions = [], submitLabel, zipGroups = [], disclosureNote, disclosureGuidePath }: Props) {
+export function ListingForm({ mode, userId, listingId, action, initial, statusOptions = [], submitLabel, zipGroups = [], disclosureNote, disclosureGuidePath, draftId }: Props) {
   const [state, formAction, pending] = useActionState<ListingFormState, FormData>(action, {});
   const values = state.values ?? initial;
   const errors = state.errors ?? {};
   const [photosBusy, setPhotosBusy] = useState(false);
   const onBusyChange = useCallback((busy: boolean) => setPhotosBusy(busy), []);
+  const [description, setDescription] = useState(values.description);
 
   // Fair Housing issues from the last submit attempt, re-checked live as the seller edits.
   const [issues, setIssues] = useState<FairHousingIssue[] | null>(null);
@@ -140,8 +144,9 @@ export function ListingForm({ mode, userId, listingId, action, initial, statusOp
             rows={8}
             required
             maxLength={DESCRIPTION_MAX}
-            defaultValue={values.description}
+            value={description}
             onChange={(e) => {
+              setDescription(e.target.value);
               if (shownIssues.length > 0) setIssues(checkFairHousing(e.target.value));
             }}
             className={`${inputClass} py-3`}
@@ -149,6 +154,17 @@ export function ListingForm({ mode, userId, listingId, action, initial, statusOp
             aria-describedby={shownIssues.length > 0 ? "fair-housing-issues" : undefined}
           />
         </Field>
+        <p className="mt-2 text-[13px] text-muted">Check every detail for accuracy before publishing.</p>
+        {mode === "create" && draftId && (
+          <DescriptionAssistant
+            draftId={draftId}
+            onPick={(text) => {
+              setDescription(text);
+              setIssues(checkFairHousing(text));
+              document.getElementById("description")?.focus();
+            }}
+          />
+        )}
         {shownIssues.length > 0 && (
           <div id="fair-housing-issues" role="alert" className="mt-3 rounded-xl border border-red-200 bg-red-50 p-4">
             <p className="text-[15px] font-semibold text-red-900">Edit these phrases to continue</p>

@@ -32,3 +32,18 @@ export async function getActiveVendorCategories(marketId: string) {
   const counts = await getVendorCategoryCounts(marketId);
   return vendorCategories.filter((c) => (counts.get(c.value) ?? 0) > 0);
 }
+
+/** A few approved vendors in one category in this market, for cross-links like the lender suggestions. */
+export const getVendorsInCategory = cache(async (marketId: string, category: VendorCategoryValue, limit = 3) => {
+  const { data, error } = await createPublicClient({ tags: [CACHE_TAGS.vendors] })
+    .from("public_vendors")
+    .select("*")
+    .eq("market_id", marketId)
+    .eq("category", category)
+    // Verified vendors first, then the longest-standing.
+    .order("verified_at", { ascending: false, nullsFirst: false })
+    .order("created_at")
+    .limit(limit);
+  if (error) throw new Error(`Could not load ${category} vendors: ${error.message}`);
+  return data;
+});

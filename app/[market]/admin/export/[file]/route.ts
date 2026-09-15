@@ -1,6 +1,7 @@
 import { areaForZip } from "@/lib/areas";
 import { getCurrentProfile } from "@/lib/auth";
 import type { Lead, ListingAlert } from "@/lib/database.types";
+import { readInterestDetails } from "@/lib/interest";
 import { attachLeadTargets } from "@/lib/leads";
 import { getMarkets } from "@/lib/market-data";
 import type { Market } from "@/lib/markets";
@@ -75,11 +76,19 @@ async function leadsCsv(scope: ExportScope) {
     return scope.market ? query.eq("market_id", scope.market.id) : query;
   });
   const withTargets = await attachLeadTargets(leads);
-  const header = ["lead_id", "market", "created_at", "type", "sent_to", "recipient_email", "sender_name", "sender_email", "sender_phone", "message", "consent", "source_page"];
-  const rows = withTargets.map((l) => [
-    l.id, marketCell(scope, l.market_id), chicago(l.created_at), l.type, l.targetLabel, l.recipientEmail, l.sender_name, l.sender_email,
-    formatUsPhone(l.sender_phone), l.message, l.consent ? "yes" : "no", l.source,
-  ]);
+  const header = [
+    "lead_id", "market", "created_at", "type", "sent_to", "recipient_email", "sender_name", "sender_email", "sender_phone",
+    "message", "consent", "source_page", "offer_amount", "financing", "pre_approved", "target_close",
+  ];
+  const rows = withTargets.map((l) => {
+    // The last four columns are filled in only for an expression of interest.
+    const d = readInterestDetails(l.details);
+    return [
+      l.id, marketCell(scope, l.market_id), chicago(l.created_at), l.type, l.targetLabel, l.recipientEmail, l.sender_name, l.sender_email,
+      formatUsPhone(l.sender_phone), l.message, l.consent ? "yes" : "no", l.source,
+      d?.offer_amount ?? "", d?.financing ?? "", d ? (d.financing === "cash" ? "cash" : d.pre_approved ? "yes" : "no") : "", d?.target_close ?? "",
+    ];
+  });
   return toCsv(header, rows);
 }
 
