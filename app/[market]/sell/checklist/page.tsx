@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
+import { CourseForm } from "@/components/course-form";
 import { CardGrid } from "@/components/photo-card";
 import { ButtonLink, Container } from "@/components/ui";
 import { VendorCard } from "@/components/vendor-card";
@@ -155,6 +156,19 @@ export default async function ChecklistPage({ params }: PageProps<"/[market]/sel
         <div className="max-w-3xl">
           <Disclaimer text={checklist.closingNote || checklist.disclaimer} />
         </div>
+        <div className="rounded-2xl bg-surface p-6 sm:p-8">
+          <h2 className="text-xl font-semibold tracking-tight">
+            Rather take it a day at a time?
+          </h2>
+          <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-muted">
+            Selling without an agent in {market.name}, one email a day for a week. Each one covers a section of this
+            checklist, with the guides and local pros for that step.
+          </p>
+          <div className="mt-5 max-w-2xl">
+            <CourseForm source="/sell/checklist" />
+          </div>
+        </div>
+
         <div className="rounded-2xl border border-line p-6 sm:p-8">
           <h2 className="text-xl font-semibold tracking-tight">Ready to list?</h2>
           <p className="mt-2 text-[15px] leading-relaxed text-muted">

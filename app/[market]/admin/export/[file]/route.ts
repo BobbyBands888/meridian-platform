@@ -1,6 +1,6 @@
 import { areaForZip } from "@/lib/areas";
 import { getCurrentProfile } from "@/lib/auth";
-import type { Lead, ListingAlert } from "@/lib/database.types";
+import type { Lead, ListingAlert, Profile } from "@/lib/database.types";
 import { readInterestDetails } from "@/lib/interest";
 import { attachLeadTargets } from "@/lib/leads";
 import { getMarkets } from "@/lib/market-data";
@@ -92,6 +92,30 @@ async function leadsCsv(scope: ExportScope) {
   return toCsv(header, rows);
 }
 
+async function buyersCsv(scope: ExportScope) {
+  const admin = createAdminClient();
+  const buyers = await fetchAll<Pick<Profile, "id" | "full_name" | "email" | "phone" | "roles" | "market_id" | "created_at">>((from, to) => {
+    const query = admin
+      .from("profiles")
+      .select("id, full_name, email, phone, roles, market_id, created_at")
+      .contains("roles", ["buyer"])
+      .order("created_at", { ascending: false })
+      .range(from, to);
+    return scope.market ? query.eq("market_id", scope.market.id) : query;
+  });
+  const header = ["profile_id", "market", "name", "email", "phone", "also", "signed_up_at"];
+  const rows = buyers.map((b) => [
+    b.id,
+    b.market_id ? marketCell(scope, b.market_id) : "",
+    b.full_name,
+    b.email,
+    formatUsPhone(b.phone),
+    b.roles.filter((r) => r !== "buyer").join(" "),
+    chicago(b.created_at),
+  ]);
+  return toCsv(header, rows);
+}
+
 async function alertsCsv(scope: ExportScope) {
   const admin = createAdminClient();
   const alerts = await fetchAll<Pick<ListingAlert, "email" | "zip" | "created_at" | "unsubscribed_at" | "market_id">>((from, to) => {
@@ -118,7 +142,7 @@ export async function GET(request: Request, { params }: RouteContext<"/[market]/
   };
   if (requested !== "all" && !scope.market) return new Response("Unknown market", { status: 404 });
 
-  const builders: Record<string, (scope: ExportScope) => Promise<string>> = { "vendors.csv": vendorsCsv, "leads.csv": leadsCsv, "alerts.csv": alertsCsv };
+  const builders: Record<string, (scope: ExportScope) => Promise<string>> = { "vendors.csv": vendorsCsv, "leads.csv": leadsCsv, "alerts.csv": alertsCsv, "buyers.csv": buyersCsv };
   const build = builders[file];
   if (!build) return new Response("Not found", { status: 404 });
 

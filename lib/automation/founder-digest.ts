@@ -7,6 +7,7 @@ import { brandName, COMPANY, DEFAULT_MARKET_SLUG, isLive, type Market } from "@/
 import { createAdminClient } from "@/lib/supabase/admin";
 import { categoryByValue } from "@/lib/vendors";
 import type { DigestSummary } from "./buyer-alerts";
+import type { CourseSendResult } from "@/lib/course";
 import type { LifecycleSummary } from "./vendor-lifecycle";
 import { daysAgo, localDate, zonedMidnight } from "./time";
 
@@ -14,7 +15,7 @@ import { daysAgo, localDate, zonedMidnight } from "./time";
 const FOUNDER_TIME_ZONE = "America/Chicago";
 const LIST_MAX = 15;
 
-export type RunReport = { alertDigests?: DigestSummary; vendorEmails?: LifecycleSummary; errors: string[] };
+export type RunReport = { alertDigests?: DigestSummary; vendorEmails?: LifecycleSummary; courseEmails?: CourseSendResult; errors: string[] };
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
 
@@ -45,7 +46,7 @@ export async function buildFounderDigest(report: RunReport, now = new Date(), { 
   const todayStart = zonedMidnight(FOUNDER_TIME_ZONE, y, mo, d);
   const yesterdayStart = new Date(todayStart.getTime() - 24 * 60 * 60 * 1000);
 
-  const [pendingVendors, pendingListings, pendingEdits, recentLeads, approvedVendors, signups, syndication, alertSends, activeListings, activeAlerts] =
+  const [pendingVendors, pendingListings, pendingEdits, recentLeads, approvedVendors, signups, syndication, alertSends, activeListings, activeAlerts, courseSignups] =
     await Promise.all([
       admin.from("vendors").select("business_name, category, market_id, created_at").eq("status", "pending").order("created_at"),
       admin.from("listings").select("street, city, zip, market_id, created_at").eq("status", "pending").order("created_at"),
@@ -57,8 +58,9 @@ export async function buildFounderDigest(report: RunReport, now = new Date(), { 
       admin.from("listing_alert_sends").select("status, via").gte("created_at", dayAgo),
       admin.from("listings").select("market_id").eq("status", "active"),
       admin.from("listing_alerts").select("market_id").is("unsubscribed_at", null),
+      admin.from("course_signups").select("market_id").gte("created_at", yesterdayStart.toISOString()).lt("created_at", todayStart.toISOString()),
     ]);
-  for (const r of [pendingVendors, pendingListings, pendingEdits, recentLeads, approvedVendors, signups, syndication, alertSends, activeListings, activeAlerts]) {
+  for (const r of [pendingVendors, pendingListings, pendingEdits, recentLeads, approvedVendors, signups, syndication, alertSends, activeListings, activeAlerts, courseSignups]) {
     if (r.error) throw new Error(`Founder digest query failed: ${r.error.message}`);
   }
 
@@ -74,11 +76,12 @@ export async function buildFounderDigest(report: RunReport, now = new Date(), { 
   const leads = await attachLeadTargets(recentLeads.data ?? []);
   const facebookIssues = syndication.data ?? [];
   const alertFailures = (alertSends.data ?? []).filter((s) => s.status === "failed").length;
-  const emailFailures = alertFailures + (report.alertDigests?.failed ?? 0) + (report.vendorEmails?.failed ?? 0);
+  const emailFailures = alertFailures + (report.alertDigests?.failed ?? 0) + (report.vendorEmails?.failed ?? 0) + (report.courseEmails?.failed ?? 0);
 
   const reviewCount = (pendingVendors.data?.length ?? 0) + (pendingListings.data?.length ?? 0) + (pendingEdits.data?.length ?? 0);
   const signupCount = signups.data?.length ?? 0;
-  const hasNews = reviewCount + leads.length + quietVendors.length + signupCount + facebookIssues.length + emailFailures + report.errors.length > 0;
+  const courseSignupCount = courseSignups.data?.length ?? 0;
+  const hasNews = reviewCount + leads.length + quietVendors.length + signupCount + courseSignupCount + facebookIssues.length + emailFailures + report.errors.length > 0;
   if (!hasNews && !force) return null;
 
   const market = markets.find((m) => m.slug === DEFAULT_MARKET_SLUG) ?? markets[0];
@@ -118,6 +121,13 @@ export async function buildFounderDigest(report: RunReport, now = new Date(), { 
     blocks.push({ kind: "list", items: [...perMarket].map(([id, n]) => ({ text: `${label(id)}: ${n}` })) });
   }
 
+  if (courseSignupCount) {
+    const perMarket = new Map<string, number>();
+    for (const s of courseSignups.data ?? []) perMarket.set(s.market_id, (perMarket.get(s.market_id) ?? 0) + 1);
+    blocks.push({ kind: "heading", text: `Seller course signups yesterday (${courseSignupCount})` });
+    blocks.push({ kind: "list", items: [...perMarket].map(([id, n]) => ({ text: `${label(id)}: ${n}` })) });
+  }
+
   const automation: string[] = [];
   const sends = alertSends.data ?? [];
   const instantSent = sends.filter((s) => s.status === "sent" && s.via === "instant").length;
@@ -128,6 +138,10 @@ export async function buildFounderDigest(report: RunReport, now = new Date(), { 
   if (report.vendorEmails) {
     const v = report.vendorEmails;
     if (v.day2 + v.day14 + v.monthly + v.failed) automation.push(`Vendor emails: ${v.day2} day-2, ${v.day14} day-14, ${v.monthly} monthly, ${v.failed} failed`);
+  }
+  if (report.courseEmails) {
+    const c = report.courseEmails;
+    if (c.sent + c.skipped + c.failed) automation.push(`Seller course: ${plural(c.sent, "email")} sent, ${c.completed} finished the week, ${c.skipped} skipped, ${c.failed} failed`);
   }
   for (const f of facebookIssues) {
     automation.push(`Facebook ${f.status === "skipped" ? "post skipped" : "post failed"} for ${label(f.market_id)}: ${f.error ?? "no details"}`);

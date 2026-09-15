@@ -39,6 +39,7 @@ export async function GET(_request: Request, { params }: RouteContext<"/[market]
     { url: url("/homes/areas"), changeFrequency: "monthly", priority: 0.6, lastModified: now },
     { url: url("/sell"), changeFrequency: "monthly", priority: 0.8, lastModified: now },
     { url: url("/sell/checklist"), changeFrequency: "weekly", priority: 0.7, lastModified: now },
+    { url: url("/sell/course"), changeFrequency: "monthly", priority: 0.6, lastModified: now },
     { url: url("/vendors"), changeFrequency: "weekly", priority: 0.8, lastModified: now },
     ...(activeCategories.length > 0 ? [{ url: url("/vendors/all"), changeFrequency: "weekly" as const, priority: 0.7, lastModified: now }] : []),
     ...activeCategories.map((c) => ({ url: url(`/vendors/${c.slug}`), changeFrequency: "weekly" as const, priority: 0.7, lastModified: now })),

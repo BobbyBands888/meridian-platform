@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { Container, EmptyState } from "@/components/ui";
-import { locationLine } from "@/lib/areas";
+import { areaForZip, locationLine } from "@/lib/areas";
 import { requireAdmin } from "@/lib/auth";
 import type { Lead } from "@/lib/database.types";
 import { interestRows, readInterestDetails } from "@/lib/interest";
@@ -25,11 +25,14 @@ const TABS = [
   { key: "vendors", label: "Pending Vendors" },
   { key: "listings", label: "Pending Listings" },
   { key: "leads", label: "All Leads" },
+  { key: "buyers", label: "Buyers" },
   { key: "markets", label: "Markets" },
 ] as const;
 type Tab = (typeof TABS)[number]["key"];
 
 const LEADS_PAGE_SIZE = 50;
+/** The Buyers tab shows the most recent of each list; the CSV exports hold everything. */
+const BUYERS_PREVIEW = 50;
 
 const notices: Record<string, string> = {
   approved: "Approved, and the email was sent.",
@@ -78,13 +81,14 @@ export default async function AdminPage({ params: routeParams, searchParams }: P
   const notice = notices[String(params.done ?? "")];
 
   const admin = createAdminClient();
-  const [vendorsCount, editsCount, listingsCount, leadsCount, alertsActive, alertsTotal] = await Promise.all([
+  const [vendorsCount, editsCount, listingsCount, leadsCount, alertsActive, alertsTotal, buyersCount] = await Promise.all([
     scoped(admin.from("vendors").select("id", { count: "exact", head: true }).eq("status", "pending")),
     scoped(admin.from("vendor_pending_edits").select("vendor_id, vendors!inner(market_id)", { count: "exact", head: true }), "vendors.market_id"),
     scoped(admin.from("listings").select("id", { count: "exact", head: true }).eq("status", "pending")),
     scoped(admin.from("leads").select("id", { count: "exact", head: true })),
     scoped(admin.from("listing_alerts").select("id", { count: "exact", head: true }).is("unsubscribed_at", null)),
     scoped(admin.from("listing_alerts").select("id", { count: "exact", head: true })),
+    scoped(admin.from("profiles").select("id", { count: "exact", head: true }).contains("roles", ["buyer"])),
   ]);
   const alertSubscribers = alertsActive.count ?? 0;
   const alertUnsubscribed = (alertsTotal.count ?? 0) - alertSubscribers;
@@ -92,6 +96,7 @@ export default async function AdminPage({ params: routeParams, searchParams }: P
     vendors: (vendorsCount.count ?? 0) + (editsCount.count ?? 0),
     listings: listingsCount.count ?? 0,
     leads: leadsCount.count ?? 0,
+    buyers: (buyersCount.count ?? 0) + (alertsTotal.count ?? 0),
     markets: markets.length,
   };
 
@@ -114,6 +119,9 @@ export default async function AdminPage({ params: routeParams, searchParams }: P
           </a>
           <a href={withScope(scope, "/admin/export/alerts.csv")} className="font-medium text-forest underline underline-offset-2">
             Export listing alerts (CSV)
+          </a>
+          <a href={withScope(scope, "/admin/export/buyers.csv")} className="font-medium text-forest underline underline-offset-2">
+            Export buyers (CSV)
           </a>
         </div>
       </div>
@@ -159,6 +167,7 @@ export default async function AdminPage({ params: routeParams, searchParams }: P
         {tab === "vendors" && <PendingVendors scope={scope} marketsById={marketsById} />}
         {tab === "listings" && <PendingListings scope={scope} marketsById={marketsById} />}
         {tab === "leads" && <AllLeads scope={scope} marketsById={marketsById} page={page} type={leadType} />}
+        {tab === "buyers" && <Buyers scope={scope} marketsById={marketsById} />}
         {tab === "markets" && <Markets markets={markets} returnTo={withScope(scope, "/admin?tab=markets")} />}
       </div>
     </Container>
@@ -423,6 +432,136 @@ async function AllLeads({ scope, marketsById, page, type }: TabProps & { page: n
           )}
         </nav>
       )}
+    </div>
+  );
+}
+
+async function Buyers({ scope, marketsById }: TabProps) {
+  const admin = createAdminClient();
+  const scopedTo = <Q extends { eq: (column: string, value: string) => Q }>(query: Q, column = "market_id") =>
+    scope.market ? query.eq(column, scope.market.id) : query;
+
+  const [accounts, alerts, accountTotal, alertTotal] = await Promise.all([
+    scopedTo(
+      admin
+        .from("profiles")
+        .select("id, full_name, email, phone, market_id, created_at")
+        .contains("roles", ["buyer"])
+        .order("created_at", { ascending: false })
+        .limit(BUYERS_PREVIEW),
+    ),
+    scopedTo(
+      admin
+        .from("listing_alerts")
+        .select("id, email, zip, market_id, created_at, unsubscribed_at")
+        .order("created_at", { ascending: false })
+        .limit(BUYERS_PREVIEW),
+    ),
+    scopedTo(admin.from("profiles").select("id", { count: "exact", head: true }).contains("roles", ["buyer"])),
+    scopedTo(admin.from("listing_alerts").select("id", { count: "exact", head: true }).is("unsubscribed_at", null)),
+  ]);
+
+  const accountRows = accounts.data ?? [];
+  const alertRows = alerts.data ?? [];
+
+  return (
+    <div className="space-y-10">
+      <dl className="grid max-w-lg grid-cols-2 gap-3">
+        <div className="rounded-xl bg-surface p-4">
+          <dt className="text-[14px] text-muted">Buyer accounts</dt>
+          <dd className="mt-1 text-3xl font-bold tracking-tight">{(accountTotal.count ?? 0).toLocaleString("en-US")}</dd>
+        </div>
+        <div className="rounded-xl bg-surface p-4">
+          <dt className="text-[14px] text-muted">Active alert signups</dt>
+          <dd className="mt-1 text-3xl font-bold tracking-tight">{(alertTotal.count ?? 0).toLocaleString("en-US")}</dd>
+        </div>
+      </dl>
+
+      <section aria-labelledby="buyer-accounts">
+        <div className="flex flex-wrap items-baseline justify-between gap-3">
+          <h2 id="buyer-accounts" className="text-xl font-semibold tracking-tight">
+            Buyer accounts <span className="text-muted">({(accountTotal.count ?? 0).toLocaleString("en-US")})</span>
+          </h2>
+          <a href={withScope(scope, "/admin/export/buyers.csv")} className="text-[15px] font-medium text-forest underline underline-offset-2">
+            Export all (CSV)
+          </a>
+        </div>
+        <p className="mt-1 text-[14px] text-muted">
+          Anyone who picked &ldquo;Buyer&rdquo; when they set up their account. Market is the site they signed up on; accounts
+          created before we recorded it show no market.
+        </p>
+        {accountRows.length ? (
+          <ul className="mt-4 divide-y divide-line rounded-2xl border border-line">
+            {accountRows.map((p) => (
+              <li key={p.id} className="flex flex-col gap-1 p-4 sm:flex-row sm:items-baseline sm:justify-between">
+                <div className="min-w-0">
+                  <p className="flex flex-wrap items-center gap-2 font-semibold">
+                    {p.full_name ?? "No name yet"}
+                    {p.market_id && <MarketBadge market={marketsById.get(p.market_id)} />}
+                  </p>
+                  <p className="break-words text-[14px] text-muted">
+                    {p.email}
+                    {p.phone ? ` · ${formatUsPhone(p.phone)}` : ""}
+                  </p>
+                </div>
+                <time dateTime={p.created_at} className="shrink-0 text-[13px] text-muted">
+                  {dateFmt.format(new Date(p.created_at))}
+                </time>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div className="mt-4">
+            <EmptyState title="No buyer accounts yet" />
+          </div>
+        )}
+        {accountRows.length >= BUYERS_PREVIEW && (
+          <p className="mt-3 text-[13px] text-muted">Showing the {BUYERS_PREVIEW} most recent. Export the CSV for all of them.</p>
+        )}
+      </section>
+
+      <section aria-labelledby="alert-signups">
+        <div className="flex flex-wrap items-baseline justify-between gap-3">
+          <h2 id="alert-signups" className="text-xl font-semibold tracking-tight">
+            Listing alert signups <span className="text-muted">({(alertTotal.count ?? 0).toLocaleString("en-US")} active)</span>
+          </h2>
+          <a href={withScope(scope, "/admin/export/alerts.csv")} className="text-[15px] font-medium text-forest underline underline-offset-2">
+            Export all (CSV)
+          </a>
+        </div>
+        <p className="mt-1 text-[14px] text-muted">Email-only signups from the buyer alert forms. No account needed.</p>
+        {alertRows.length ? (
+          <ul className="mt-4 divide-y divide-line rounded-2xl border border-line">
+            {alertRows.map((a) => {
+              const market = marketsById.get(a.market_id);
+              return (
+                <li key={a.id} className="flex flex-col gap-1 p-4 sm:flex-row sm:items-baseline sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="flex flex-wrap items-center gap-2 break-words font-medium">
+                      <MarketBadge market={market} />
+                      {a.email}
+                      {a.unsubscribed_at && <span className="rounded-full bg-surface px-2 py-0.5 text-[12px] text-muted">Unsubscribed</span>}
+                    </p>
+                    <p className="text-[14px] text-muted">
+                      {a.zip && market ? `${a.zip} · ${areaForZip(market, a.zip)}` : "Every area"}
+                    </p>
+                  </div>
+                  <time dateTime={a.created_at} className="shrink-0 text-[13px] text-muted">
+                    {dateFmt.format(new Date(a.created_at))}
+                  </time>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <div className="mt-4">
+            <EmptyState title="No alert signups yet" />
+          </div>
+        )}
+        {alertRows.length >= BUYERS_PREVIEW && (
+          <p className="mt-3 text-[13px] text-muted">Showing the {BUYERS_PREVIEW} most recent. Export the CSV for all of them.</p>
+        )}
+      </section>
     </div>
   );
 }

@@ -203,6 +203,15 @@ Every market's site footer, the hub footer, and every email footer show `Ownvist
 - **Export vendors (CSV)**, **Export leads (CSV)**, and **Export listing alerts (CSV)** download the filtered market (or all markets), with a market column. They include contact details, so treat the files as private.
 - **Listing alert signups** (under the Admin heading) counts active buyer signups from the home page and /homes. Signups are only collected for now: each gets a confirmation email with an unsubscribe link, and no alert emails are sent yet.
 
+## Growth features (Phase 9)
+
+- **Vendor badge:** an approved vendor's dashboard has an embed card with the market's badge, served from `/badge/<vendor id>` on that market's domain. It changes from "Listed on" to "Verified on" by itself once verification is done, everywhere it's already embedded. Nothing to configure.
+- **Yard sign and flyer:** a seller with a published listing gets both as PDFs from their listing dashboard, built on demand. Neither carries the street address, and the flyer leaves out the description, so it's facts only.
+- **Neighborhood pages:** `/homes/<area>` exists for every area in the market's ZIP map (`lib/markets/zips/`), with `/homes/areas` listing them by county. Both are in the sitemap. A new market gets its area pages the moment its ZIP file lands.
+- **Write it for me:** needs `ANTHROPIC_API_KEY`. Uses `claude-sonnet-4-6`, sends only the facts the seller typed plus their notable-features box, and runs the Fair Housing filter on what comes back. Capped at 12 runs per seller per day. Every run is logged in `listing_ai_usage` with token counts, matched to the listing once it's submitted: `select model, sum(input_tokens), sum(output_tokens), count(*) from listing_ai_usage group by model;` for the bill.
+- **Seller course:** `/sell/course`, with a second signup on the checklist page. Seven emails from the checklist's seven sections. Nothing to configure.
+- **Buyers tab:** admin → Buyers shows buyer accounts and alert signups side by side, filtered by market, with CSV exports. The market column comes from `profiles.market_id`, set on an account's first sign-in; accounts from before Phase 9 show no market.
+
 ## Vercel
 
 - **Domains:** for each market, `www.<domain>` is primary and the bare domain redirects to it (Project → Settings → Domains). Add `getownvista.com` and `www.getownvista.com` the same way for the hub.
@@ -220,9 +229,10 @@ Every market's site footer, the hub footer, and every email footer show `Ownvist
 | Daily job | **Vendor day 2:** "Three things that get your profile picked", 2 to 7 days after approval. | Yes |
 | Daily job | **Vendor day 14:** "How's it going?" with their inquiry count, reply-to `ADMIN_EMAIL`, 14 to 21 days after approval. | Yes |
 | Daily job, on the 1st (catches up on the 2nd and 3rd) | **Vendor monthly summary:** "You received N inquiries through <Market> Buys in <month>" with the list, or "Here's how to get your first inquiry" with the three tips. Skipped for vendors approved in the last 3 days of the month. | Yes |
+| Signup, then daily job | **Seven-day seller course:** one email a day for a week, each covering a section of the pre-sale checklist with links to the matching guide and vendor category. Day 1 goes out the moment someone signs up (at `/sell/course` or from the checklist page); the daily job sends days 2 to 7. Anyone who has listed a home is dropped from the course. | Yes |
 | Daily job | **Founder digest** to `ADMIN_EMAIL`: pending vendors, listings, and edits; leads in the last 24 hours; vendors approved 30+ days ago with no inquiries; alert signups yesterday; skipped or failed automation (like a missing Facebook token); a line per market. Not sent when there's nothing to report. | No |
 
-Vendor emails only go to approved vendors in live markets. For a vendor approved before their market launched, day 2 and day 14 count from the launch date. Every email, marketing or not, has the Ownvista mailing address in the footer. Vendors can turn off tips and monthly summaries from the link in those emails; approval and inquiry emails always go out. Every send is logged (`listing_alert_sends`, `vendor_emails`, `listing_syndication`), and the admin listing page shows each approved listing's alert and Facebook results.
+Vendor emails only go to approved vendors in live markets. For a vendor approved before their market launched, day 2 and day 14 count from the launch date. Every email, marketing or not, has the Ownvista mailing address in the footer. Vendors can turn off tips and monthly summaries from the link in those emails; approval and inquiry emails always go out. Every send is logged (`listing_alert_sends`, `vendor_emails`, `listing_syndication`, `course_emails`), and the admin listing page shows each approved listing's alert and Facebook results.
 
 ### Daily job (Vercel Cron)
 

@@ -81,6 +81,10 @@ export async function requestMagicLink(_prev: SignInState, formData: FormData): 
     return failed;
   }
 
+  // generateLink creates the account on first use. Record the site they signed up on, once, for the admin's
+  // Buyers tab; a null market_id means the account predates this.
+  await createAdminClient().from("profiles").update({ market_id: market.id }).eq("email", email).is("market_id", null);
+
   const link = `${await requestOrigin(market)}/auth/confirm?token_hash=${data.properties.hashed_token}&type=email&next=${encodeURIComponent(next)}`;
   const brand = brandName(market);
   const sent = await sendEmail({

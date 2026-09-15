@@ -1,4 +1,6 @@
 import { sendAlertDigests } from "@/lib/automation/buyer-alerts";
+import { sendCourseEmails } from "@/lib/course";
+import { getMarkets } from "@/lib/market-data";
 import { sendFounderDigest, type RunReport } from "@/lib/automation/founder-digest";
 import { sendVendorLifecycleEmails } from "@/lib/automation/vendor-lifecycle";
 
@@ -8,8 +10,8 @@ export const maxDuration = 60;
 
 /**
  * The daily job: buyer alert digests (listings held back by the daily cap), vendor day-2/day-14 emails and the
- * monthly summary (on the 1st), then the founder digest, which reports on this run too. Each step is independent,
- * so one failing doesn't stop the rest.
+ * monthly summary (on the 1st), the next day of the seven-day seller course, then the founder digest, which
+ * reports on this run too. Each step is independent, so one failing doesn't stop the rest.
  *
  * Vercel Cron calls this with "Authorization: Bearer $CRON_SECRET". Outside production, ?now=2026-10-01T12:00:00Z
  * runs it as of another time, for testing the monthly summary and day-2/day-14 windows.
@@ -37,6 +39,7 @@ export async function GET(request: Request) {
 
   report.alertDigests = await step("Alert digests", sendAlertDigests);
   report.vendorEmails = await step("Vendor emails", () => sendVendorLifecycleEmails(now));
+  report.courseEmails = await step("Seller course", async () => sendCourseEmails(await getMarkets(), now));
   const founderDigest = await step("Founder digest", () => sendFounderDigest(report, now));
 
   return Response.json({ now: now.toISOString(), ...report, founderDigest });
