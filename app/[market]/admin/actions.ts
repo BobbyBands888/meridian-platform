@@ -2,6 +2,9 @@
 
 import { updateTag } from "next/cache";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
+import { sendNewListingAlerts } from "@/lib/automation/buyer-alerts";
+import { postListingToFacebook } from "@/lib/automation/facebook";
 import { getCurrentProfile } from "@/lib/auth";
 import { getMarketById } from "@/lib/market-data";
 import type { MarketStatus } from "@/lib/markets";
@@ -111,6 +114,12 @@ export async function approveListing(formData: FormData) {
   if (error) throw new Error(error.message);
   await sendListingApproved(market, listing.profiles.email, listing);
   refreshListings();
+  // Buyer alerts and the Facebook post run after the response, so approving stays fast. Both log what they did and
+  // never repeat for the same listing, so approving again after a rejection doesn't resend.
+  after(async () => {
+    const [alerts, facebook] = await Promise.allSettled([sendNewListingAlerts(listingId), postListingToFacebook(listingId)]);
+    console.log("listing approved automation", listingId, JSON.stringify({ alerts, facebook }));
+  });
   finish(formData, `/admin/listings/${listingId}`, "approved");
 }
 

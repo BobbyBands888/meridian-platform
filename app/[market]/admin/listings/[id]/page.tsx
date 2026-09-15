@@ -39,6 +39,12 @@ export default async function AdminListingPage({ params, searchParams }: PagePro
     .maybeSingle();
   if (!listing) notFound();
   const market = await getMarketById(listing.market_id);
+  const admin = createAdminClient();
+  const [{ data: alertSends }, { data: facebook }] = await Promise.all([
+    admin.from("listing_alert_sends").select("status").eq("listing_id", listing.id),
+    admin.from("listing_syndication").select("status, error, external_id").eq("listing_id", listing.id).eq("channel", "facebook").maybeSingle(),
+  ]);
+  const sendCount = (status: string) => (alertSends ?? []).filter((a) => a.status === status).length;
 
   const photos = [...listing.listing_photos].sort((a, b) => a.sort_order - b.sort_order);
   const issues = checkFairHousing(listing.description);
@@ -106,6 +112,29 @@ export default async function AdminListingPage({ params, searchParams }: PagePro
         </div>
 
         <aside className="space-y-6">
+          {published && (
+            <section aria-labelledby="automation-heading" className="rounded-2xl border border-line p-5">
+              <h2 id="automation-heading" className="text-lg font-semibold">
+                After approval
+              </h2>
+              <dl className="mt-3 space-y-2 text-[15px]">
+                <div>
+                  <dt className="text-muted">Buyer alerts</dt>
+                  <dd>
+                    {alertSends?.length
+                      ? `${sendCount("sent")} sent · ${sendCount("queued")} queued for the digest${sendCount("failed") ? ` · ${sendCount("failed")} failed` : ""}${sendCount("skipped") ? ` · ${sendCount("skipped")} skipped` : ""}`
+                      : "No matching subscribers"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted">Facebook</dt>
+                  <dd className="break-words">
+                    {!facebook ? "Not posted" : facebook.status === "posted" ? `Posted (${facebook.external_id})` : `${facebook.status === "skipped" ? "Skipped" : "Failed"}: ${facebook.error ?? ""}`}
+                  </dd>
+                </div>
+              </dl>
+            </section>
+          )}
           <section aria-labelledby="seller-heading" className="rounded-2xl border border-line p-5">
             <h2 id="seller-heading" className="text-lg font-semibold">
               Seller

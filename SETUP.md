@@ -25,7 +25,9 @@ Set these in `.env.local` for local development, and in **Vercel → Project →
 | `RESEND_API_KEY` | Resend → API Keys → Create API key (Sending access, **All domains**, so it can send for every market) | **No, server only** |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Cloudflare → Turnstile → your widget → Site Key | Yes |
 | `TURNSTILE_SECRET_KEY` | Cloudflare → Turnstile → your widget → Secret Key | **No, server only** |
-| `ADMIN_EMAIL` | The address that receives approval requests and lead copies | No |
+| `ADMIN_EMAIL` | The address that receives approval requests, lead copies, the morning digest, and replies to the day-14 vendor email | No |
+| `CRON_SECRET` | Any long random string you make up (for example `openssl rand -hex 32`). Vercel sends it to the daily job so nobody else can trigger it | **No, server only** |
+| `FACEBOOK_PAGE_TOKEN_NASHVILLE` (one per market: `FACEBOOK_PAGE_TOKEN_TAMPA`, `FACEBOOK_PAGE_TOKEN_ORLANDO`, ...) | A Facebook Page access token; see **Facebook Page posting**. Optional: a market without one just isn't posted to Facebook | **No, server only** |
 
 The Supabase variable names say "anon" and "service role", but they hold the new publishable and secret keys.
 
@@ -44,6 +46,7 @@ Run each file in `supabase/migrations/` in filename order, once each (re-running
 5. `20260918000000_vendor_verification.sql` (Verified vendor tier and the private `vendor-documents` bucket)
 6. `20260919000000_listing_alerts.sql` (Buyer listing alert signups; server-only table)
 7. `20260920000000_markets.sql` (Phase 7: markets table, `market_id` on vendors, listings, leads, and alerts, sign-in email rate limit)
+8. `20260921000000_automation.sql` (Phase 8: alert send log, vendor email log, Facebook post log, vendor approval date and email preferences, market launch date)
 
 If you ever re-run an earlier file, re-run every later file after it too, since later files replace some of its functions.
 
@@ -182,7 +185,7 @@ The guide with `topic: disclosure` is linked from the listing form, listing page
 
 ## Mailing address
 
-Every market's site footer, the hub footer, and marketing emails (listing alert confirmations, pre-launch vendor confirmations and approvals, and future alert digests) show `Ownvista, PO Box 44, Medford, MA 02155`. It's set once as `COMPANY.mailingAddress` in `lib/markets.ts`; send a new email with `marketing: true` to include it.
+Every market's site footer, the hub footer, and every email footer show `Ownvista, PO Box 44, Medford, MA 02155`. It's set once as `COMPANY.mailingAddress` in `lib/markets.ts`. Marketing emails (buyer alerts and digests, the alert signup confirmation, and vendor tips and summaries) also get an unsubscribe link and one-click unsubscribe headers: pass `unsubscribe` to `sendEmail`.
 
 ## Checklist
 
@@ -202,6 +205,50 @@ Every market's site footer, the hub footer, and marketing emails (listing alert 
 
 - **Domains:** for each market, `www.<domain>` is primary and the bare domain redirects to it (Project → Settings → Domains). Add `getownvista.com` and `www.getownvista.com` the same way for the hub.
 - **Analytics:** Project → Analytics → Enable. The site already includes the Analytics component.
+
+## Automation
+
+### What sends when
+
+| When | What | Marketing (unsubscribe link)? |
+| --- | --- | --- |
+| A listing is approved | **Buyer alerts:** one email per listing to every active subscriber in that market whose ZIP is blank, the same ZIP, or in the same county. Up to 3 a day per subscriber (their market's calendar day); listings past that are held for the next morning's digest. Never the same listing twice. | Yes |
+| A listing is approved | **Facebook post** on the market's Page: cover photo, price, beds/baths/sqft, place, and link. Skipped if the market has no page token. Never posted twice. | n/a |
+| Daily job | **Alert digest:** one email per subscriber with the listings held back by the daily cap. Sold or withdrawn listings and unsubscribed buyers are dropped. | Yes |
+| Daily job | **Vendor day 2:** "Three things that get your profile picked", 2 to 7 days after approval. | Yes |
+| Daily job | **Vendor day 14:** "How's it going?" with their inquiry count, reply-to `ADMIN_EMAIL`, 14 to 21 days after approval. | Yes |
+| Daily job, on the 1st (catches up on the 2nd and 3rd) | **Vendor monthly summary:** "You received N inquiries through <Market> Buys in <month>" with the list, or "Here's how to get your first inquiry" with the three tips. Skipped for vendors approved in the last 3 days of the month. | Yes |
+| Daily job | **Founder digest** to `ADMIN_EMAIL`: pending vendors, listings, and edits; leads in the last 24 hours; vendors approved 30+ days ago with no inquiries; alert signups yesterday; skipped or failed automation (like a missing Facebook token); a line per market. Not sent when there's nothing to report. | No |
+
+Vendor emails only go to approved vendors in live markets. For a vendor approved before their market launched, day 2 and day 14 count from the launch date. Every email, marketing or not, has the Ownvista mailing address in the footer. Vendors can turn off tips and monthly summaries from the link in those emails; approval and inquiry emails always go out. Every send is logged (`listing_alert_sends`, `vendor_emails`, `listing_syndication`), and the admin listing page shows each approved listing's alert and Facebook results.
+
+### Daily job (Vercel Cron)
+
+`vercel.json` schedules `/api/cron/daily` for `0 12 * * *` (12:00 UTC, about 7 a.m. Central). On the Hobby plan it runs once a day at some point in that hour.
+
+1. Set `CRON_SECRET` in Vercel (Production) and redeploy. Vercel sends it automatically; requests without it get a 401.
+2. Check it: Vercel → Project → Settings → Cron Jobs shows the job and has a **Run** button. The response lists what it sent.
+3. To run it by hand: `curl -H "Authorization: Bearer $CRON_SECRET" https://www.nashvillebuys.com/api/cron/daily`
+
+Locally (not in production) you can run it as of another time, to test the monthly summary or the day-2 and day-14 windows: `curl -H "Authorization: Bearer $CRON_SECRET" "http://localhost:3000/api/cron/daily?now=2026-10-01T12:00:00Z"`.
+
+## Facebook Page posting
+
+Each market posts approved listings to its own Facebook Page. You need a Page per market, one Meta app, and a Page access token per market.
+
+1. **Create the Page** (skip if it exists): facebook.com → Pages → Create new Page, named for the market (for example Nashville Buys). You need full control of it (Page settings → Page access → you're listed with full control).
+2. **Create a Meta app** (once, for all markets): https://developers.facebook.com/apps → **Create app**.
+   - App name: `Ownvista Publisher`. Contact email: yours.
+   - Use case: **Manage everything on your Page**. Business portfolio: your Ownvista business portfolio, or none for now.
+   - The app can stay in **Development** mode. You don't need App Review for Pages you manage yourself, because you have a role on the app.
+3. **Get a user token with Page permissions:** open the Graph API Explorer (https://developers.facebook.com/tools/explorer), pick `Ownvista Publisher` as the app, and under Permissions add `pages_show_list`, `pages_read_engagement`, and `pages_manage_posts`. Click **Generate Access Token**, and in the Facebook dialog choose the market Pages to allow.
+4. **Make it long-lived:** open the Access Token Debugger (https://developers.facebook.com/tools/debug/accesstoken), paste the token, click **Debug**, then **Extend Access Token** at the bottom. Copy the new long-lived user token.
+5. **Get the Page tokens:** back in the Graph API Explorer, paste the long-lived user token into the Access Token box and run `GET me/accounts?fields=name,access_token`. Each Page in the result has its own `access_token`. Page tokens made from a long-lived user token don't expire.
+6. **Check a Page token** in the Access Token Debugger: **Type** is Page, **Expires** is Never, and **Scopes** include `pages_manage_posts`.
+7. **Add it to Vercel** (Production only): `FACEBOOK_PAGE_TOKEN_NASHVILLE` = the Nashville Page's `access_token`. Use the market's slug in capitals, with dashes as underscores. Redeploy.
+8. **Test:** approve a listing, then check the Page and the "After approval" box on the admin listing page. Errors from Facebook show there and in the next morning digest.
+
+Keep the tokens private: anyone with one can post as the Page. Tokens stop working if you change your Facebook password, lose your role on the Page, or remove the app's access (Facebook → Settings → Business integrations); repeat steps 3 to 7 to get new ones. Listings approved while a market has no token are skipped for good (the digest lists them); post those by hand if you want them on the Page.
 
 ## Local development: simulating markets
 
@@ -244,4 +291,5 @@ values
 6. **Guides (optional before launch).** Add markdown files to `content/guides/atlanta/` (see **Guides**). Mark the disclosure guide with `topic: disclosure`. Commit and push.
 7. **Supabase Auth URLs.** Authentication → URL Configuration → Redirect URLs → add `https://atlantabuys.com/**` and `https://www.atlantabuys.com/**`. (The site builds its own sign-in links, but keep these for any email Supabase sends.)
 8. **Turnstile.** Cloudflare → Turnstile → your widget → Hostname management → add `atlantabuys.com` and `www.atlantabuys.com`. Forms (sign-in, alerts, contact) on the new domain fail the bot check until this is done.
-9. **Flip to live.** Sign in to `/admin` on any market's domain → **Markets** → check the confirmation box next to the new market → **Flip to live**. Listings, the vendor directory (including pre-launch vendors you approved), guides, and the sitemap go public right away, and the market appears in the header's market switcher. Approved pre-launch vendors aren't emailed automatically, so let them know they're live.
+9. **Facebook (optional).** Create the market's Page and add `FACEBOOK_PAGE_TOKEN_ATLANTA` in Vercel (see **Facebook Page posting**). Without it, listings still go live; they just aren't posted to Facebook.
+10. **Flip to live.** Sign in to `/admin` on any market's domain → **Markets** → check the confirmation box next to the new market → **Flip to live**. Listings, the vendor directory (including pre-launch vendors you approved), guides, and the sitemap go public right away, and the market appears in the header's market switcher. Approved pre-launch vendors aren't emailed automatically, so let them know they're live.

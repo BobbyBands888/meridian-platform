@@ -30,7 +30,8 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Skip build assets, images, and the shared icons. Everything else (pages, robots.txt, sitemap.xml) goes through.
-    "/((?!_next/static|_next/image|icon.svg|apple-icon|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|ico)$).*)",
+    // Skip build assets, images, the shared icons, and site-wide API routes (the daily cron job). Everything else
+    // (pages, robots.txt, sitemap.xml) goes through.
+    "/((?!_next/static|_next/image|api/|icon.svg|apple-icon|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|ico)$).*)",
   ],
 };

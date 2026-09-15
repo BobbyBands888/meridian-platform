@@ -1,6 +1,6 @@
 import "server-only";
 import { areaForZip } from "@/lib/areas";
-import { sendEmail, siteLink } from "@/lib/email";
+import { sendEmail, siteLink, type Unsubscribe } from "@/lib/email";
 import { brandName, type Market } from "@/lib/markets";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -10,13 +10,14 @@ export const isAlertToken = (token: unknown): token is string => typeof token ==
 export const unsubscribePath = (token: string) => `/alerts/unsubscribe?token=${token}`;
 
 /**
- * Every alert email carries the unsubscribe link in the body and in List-Unsubscribe headers. The headers let Gmail
- * and Apple Mail show their own unsubscribe button, which POSTs to the one-click endpoint (RFC 8058).
+ * Every buyer alert email carries an unsubscribe link in the footer and List-Unsubscribe headers. The headers let
+ * Gmail and Apple Mail show their own unsubscribe button, which POSTs to the one-click endpoint (RFC 8058).
  */
-function unsubscribeHeaders(market: Market, token: string) {
+export function alertUnsubscribe(market: Market, token: string): Unsubscribe {
   return {
-    "List-Unsubscribe": `<${siteLink(market, `/alerts/unsubscribe/one-click?token=${token}`)}>`,
-    "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+    url: siteLink(market, unsubscribePath(token)),
+    oneClickUrl: siteLink(market, `/alerts/unsubscribe/one-click?token=${token}`),
+    label: "You're getting this because you signed up for listing alerts.",
   };
 }
 
@@ -31,11 +32,10 @@ export function sendAlertConfirmation(market: Market, { email, zip, token }: { e
   const brand = brandName(market);
   return sendEmail({
     market,
-    marketing: true,
     to: email,
     subject: `You're signed up for ${brand} listing alerts`,
     heading: "You're on the list",
-    headers: unsubscribeHeaders(market, token),
+    unsubscribe: alertUnsubscribe(market, token),
     blocks: [
       {
         kind: "p",
@@ -49,11 +49,6 @@ export function sendAlertConfirmation(market: Market, { email, zip, token }: { e
       {
         kind: "p",
         text: "Every home is listed by its owner, and you contact sellers directly.",
-      },
-      {
-        kind: "p",
-        text: "Didn't sign up, or changed your mind?",
-        link: { label: "Unsubscribe", href: siteLink(market, unsubscribePath(token)) },
       },
     ],
   });

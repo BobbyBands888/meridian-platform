@@ -25,6 +25,8 @@ export type Market = {
   disclosure_note: string;
   timezone: string;
   sort_order: number;
+  /** When the market first went live; null while coming soon. */
+  launched_at: string | null;
 };
 
 export const COMPANY = {

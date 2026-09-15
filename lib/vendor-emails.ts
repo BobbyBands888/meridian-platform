@@ -23,7 +23,6 @@ export function sendVendorReceived(market: Market, to: string, vendor: VendorInf
   if (!isLive(market)) {
     return sendEmail({
       market,
-      marketing: true,
       to,
       subject: `You're pre-registered with ${brand}`,
       heading: `You're pre-registered with ${brand}`,
@@ -80,7 +79,6 @@ export function sendVendorApproved(market: Market, to: string, vendor: VendorInf
   if (!isLive(market)) {
     return sendEmail({
       market,
-      marketing: true,
       to,
       subject: `You're approved for the ${brand} launch`,
       heading: `You're approved for the ${brand} launch`,

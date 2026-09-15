@@ -43,6 +43,9 @@ type VendorRow = {
   status: VendorStatus;
   founding_vendor: boolean;
   market_id: string;
+  approved_at: string | null;
+  lifecycle_unsubscribed_at: string | null;
+  email_token: string;
   created_at: string;
 };
 
@@ -116,6 +119,48 @@ type ListingAlertRow = {
 
 type MarketRow = Market & { created_at: string; updated_at: string };
 
+export type AlertSendStatus = "sending" | "sent" | "queued" | "skipped" | "failed";
+
+type ListingAlertSendRow = {
+  id: string;
+  alert_id: string;
+  listing_id: string;
+  market_id: string;
+  status: AlertSendStatus;
+  via: "instant" | "digest" | null;
+  send_date: string | null;
+  resend_id: string | null;
+  error: string | null;
+  created_at: string;
+  sent_at: string | null;
+};
+
+export type VendorEmailKind = "day2" | "day14" | "monthly";
+
+type VendorEmailRow = {
+  id: string;
+  vendor_id: string;
+  kind: VendorEmailKind;
+  period: string;
+  status: "sending" | "sent" | "failed";
+  resend_id: string | null;
+  error: string | null;
+  created_at: string;
+  sent_at: string | null;
+};
+
+type ListingSyndicationRow = {
+  id: string;
+  listing_id: string;
+  market_id: string;
+  channel: "facebook";
+  status: "posting" | "posted" | "skipped" | "failed";
+  external_id: string | null;
+  error: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 type SignInLinkRequestRow = { id: number; email: string; created_at: string };
 
 type VendorCertificationRow = {
@@ -133,9 +178,34 @@ export type Database = {
     Tables: {
       markets: {
         Row: MarketRow;
-        Insert: Omit<MarketRow, "id" | "created_at" | "updated_at"> & Partial<Pick<MarketRow, "id">>;
+        Insert: Omit<MarketRow, "id" | "created_at" | "updated_at" | "launched_at"> & Partial<Pick<MarketRow, "id" | "launched_at">>;
         Update: Partial<MarketRow>;
         Relationships: [];
+      };
+      listing_alert_sends: {
+        Row: ListingAlertSendRow;
+        Insert: Pick<ListingAlertSendRow, "alert_id" | "listing_id" | "market_id" | "status"> & Partial<ListingAlertSendRow>;
+        Update: Partial<ListingAlertSendRow>;
+        Relationships: [
+          { foreignKeyName: "listing_alert_sends_alert_id_fkey"; columns: ["alert_id"]; isOneToOne: false; referencedRelation: "listing_alerts"; referencedColumns: ["id"] },
+          { foreignKeyName: "listing_alert_sends_listing_id_fkey"; columns: ["listing_id"]; isOneToOne: false; referencedRelation: "listings"; referencedColumns: ["id"] },
+        ];
+      };
+      vendor_emails: {
+        Row: VendorEmailRow;
+        Insert: Pick<VendorEmailRow, "vendor_id" | "kind" | "status"> & Partial<VendorEmailRow>;
+        Update: Partial<VendorEmailRow>;
+        Relationships: [
+          { foreignKeyName: "vendor_emails_vendor_id_fkey"; columns: ["vendor_id"]; isOneToOne: false; referencedRelation: "vendors"; referencedColumns: ["id"] },
+        ];
+      };
+      listing_syndication: {
+        Row: ListingSyndicationRow;
+        Insert: Pick<ListingSyndicationRow, "listing_id" | "market_id" | "channel" | "status"> & Partial<ListingSyndicationRow>;
+        Update: Partial<ListingSyndicationRow>;
+        Relationships: [
+          { foreignKeyName: "listing_syndication_listing_id_fkey"; columns: ["listing_id"]; isOneToOne: false; referencedRelation: "listings"; referencedColumns: ["id"] },
+        ];
       };
       sign_in_link_requests: {
         Row: SignInLinkRequestRow;
@@ -151,8 +221,8 @@ export type Database = {
       };
       vendors: {
         Row: VendorRow;
-        Insert: Omit<VendorRow, "id" | "status" | "founding_vendor" | "created_at" | "website" | "market_id"> &
-          Partial<Pick<VendorRow, "id" | "status" | "founding_vendor" | "created_at" | "website" | "market_id">>;
+        Insert: Omit<VendorRow, "id" | "status" | "founding_vendor" | "created_at" | "website" | "market_id" | "approved_at" | "lifecycle_unsubscribed_at" | "email_token"> &
+          Partial<Pick<VendorRow, "id" | "status" | "founding_vendor" | "created_at" | "website" | "market_id" | "approved_at" | "lifecycle_unsubscribed_at" | "email_token">>;
         Update: Partial<VendorRow>;
         Relationships: [
           { foreignKeyName: "vendors_profile_id_fkey"; columns: ["profile_id"]; isOneToOne: true; referencedRelation: "profiles"; referencedColumns: ["id"] },
@@ -217,7 +287,7 @@ export type Database = {
     };
     Views: {
       public_vendors: {
-        Row: Omit<VendorRow, "profile_id" | "status"> & { verified_at: string | null };
+        Row: Omit<VendorRow, "profile_id" | "status" | "approved_at" | "lifecycle_unsubscribed_at" | "email_token"> & { verified_at: string | null };
         Relationships: [];
       };
       public_listings: {
