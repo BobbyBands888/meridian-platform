@@ -16,6 +16,11 @@ const variants = {
 
 type Variant = keyof typeof variants;
 
+/** Button styling for elements that aren't Button or ButtonLink, like a plain anchor to a file route. */
+export function buttonClass(variant: Variant = "primary", className = "") {
+  return `${base} ${variants[variant]} ${className}`;
+}
+
 export function Button({
   variant = "primary",
   className = "",
@@ -29,7 +34,7 @@ export function Button({
       {...props}
       disabled={props.disabled || pending}
       aria-busy={pending || undefined}
-      className={`${base} ${variants[variant]} ${className}`}
+      className={buttonClass(variant, className)}
     >
       {pending && <Spinner />}
       {pending && pendingLabel ? pendingLabel : children}
@@ -42,7 +47,7 @@ export function ButtonLink({
   className = "",
   ...props
 }: ComponentProps<typeof Link> & { variant?: Variant }) {
-  return <Link {...props} className={`${base} ${variants[variant]} ${className}`} />;
+  return <Link {...props} className={buttonClass(variant, className)} />;
 }
 
 export function Spinner({ className = "" }: { className?: string }) {

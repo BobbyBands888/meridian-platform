@@ -32,6 +32,74 @@ export function locationLine(market: AreaMarket, zip: string, city = cityForZip(
   return area === city ? `${city}, ${market.state_code} ${zip}` : `${area}, ${city}, ${market.state_code} ${zip}`;
 }
 
+/** One named area in a market's ZIP map: a neighborhood inside a big city, or a town. */
+export type Area = {
+  slug: string;
+  name: string;
+  /** The county with the most of this area's ZIP codes; a few areas straddle a line. */
+  county: string;
+  city: string;
+  zips: string[];
+};
+
+export const areaSlug = (name: string) =>
+  name
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+
+const areaCache = new Map<string, Area[]>();
+
+/** Every area in a market's ZIP map, in alphabetical order. */
+export function marketAreas(market: AreaMarket): Area[] {
+  const cached = areaCache.get(market.slug);
+  if (cached) return cached;
+
+  const grouped = new Map<string, { name: string; zips: string[]; counties: string[]; cities: string[] }>();
+  for (const [zip, info] of Object.entries(dataFor(market).zips)) {
+    const entry = grouped.get(info.area) ?? { name: info.area, zips: [], counties: [], cities: [] };
+    entry.zips.push(zip);
+    entry.counties.push(info.county);
+    entry.cities.push(info.city);
+    grouped.set(info.area, entry);
+  }
+
+  const commonest = (values: string[]) =>
+    [...new Set(values)].sort((a, b) => values.filter((v) => v === b).length - values.filter((v) => v === a).length)[0];
+
+  const areas = [...grouped.values()]
+    .map((entry): Area => ({
+      slug: areaSlug(entry.name),
+      name: entry.name,
+      county: commonest(entry.counties),
+      city: commonest(entry.cities),
+      zips: entry.zips.sort(),
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  areaCache.set(market.slug, areas);
+  return areas;
+}
+
+export function areaBySlug(market: AreaMarket, slug: string): Area | undefined {
+  return marketAreas(market).find((a) => a.slug === slug);
+}
+
+/** Areas grouped by county, in the market's county order, for the "All areas" page. */
+export function areasByCounty(market: AreaMarket): { county: string; areas: Area[] }[] {
+  const areas = marketAreas(market);
+  return dataFor(market)
+    .counties.map((county) => ({ county, areas: areas.filter((a) => a.county === county) }))
+    .filter((group) => group.areas.length > 0);
+}
+
+/** "ZIP 37206" or "ZIPs 37206, 37207, and 37216" */
+export function zipPhrase(zips: string[]) {
+  if (zips.length === 1) return `ZIP ${zips[0]}`;
+  return `ZIPs ${zips.slice(0, -1).join(", ")}${zips.length > 2 ? "," : ""} and ${zips.at(-1)}`;
+}
+
 export type ZipGroup = { county: string; options: { zip: string; label: string }[] };
 
 /** ZIP options grouped by county, for select menus. */

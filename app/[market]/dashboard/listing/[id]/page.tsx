@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ButtonLink, Container } from "@/components/ui";
+import { buttonClass, ButtonLink, Container } from "@/components/ui";
 import { requireProfile } from "@/lib/auth";
 import type { ListingStatus } from "@/lib/database.types";
 import { formatPrice, listingPath, statusLabels } from "@/lib/listings";
@@ -106,8 +106,30 @@ export default async function ManageListingPage({ params }: PageProps<"/[market]
           </div>
         </section>
 
-        <section aria-labelledby="inquiries-heading" className="lg:sticky lg:top-24 lg:self-start">
-          <div className="rounded-2xl border border-line p-6">
+        <div className="space-y-6 lg:sticky lg:top-24 lg:self-start">
+          {published && (
+            <section aria-labelledby="print-heading" className="rounded-2xl border border-line p-6">
+              <h2 id="print-heading" className="text-2xl font-semibold tracking-tight">
+                Print a sign or flyer
+              </h2>
+              <p className="mt-2 text-[15px] leading-relaxed text-muted">
+                Ready-to-print PDFs with a QR code to this listing. Neither one shows your street address.
+              </p>
+              <div className="mt-5 flex flex-col gap-3">
+                <a href={`/dashboard/listing/${listing.id}/print/sign`} target="_blank" rel="noopener" className={buttonClass("secondary", "sm:w-full")}>
+                  Print a yard sign
+                </a>
+                <a href={`/dashboard/listing/${listing.id}/print/flyer`} target="_blank" rel="noopener" className={buttonClass("secondary", "sm:w-full")}>
+                  Print a flyer
+                </a>
+              </div>
+              <p className="mt-3 text-[13px] leading-relaxed text-muted">
+                Sign: 18 by 24 inches, landscape, for a standard sign frame. Flyer: letter size, with your cover photo.
+              </p>
+            </section>
+          )}
+
+          <section aria-labelledby="inquiries-heading" className="rounded-2xl border border-line p-6">
             <h2 id="inquiries-heading" className="text-2xl font-semibold tracking-tight">
               Inquiries <span className="text-muted">({counts.allTime})</span>
             </h2>
@@ -144,8 +166,8 @@ export default async function ManageListingPage({ params }: PageProps<"/[market]
                 {published ? "No inquiries yet. Buyers' messages will appear here and arrive by email." : "Inquiries will appear here once your listing is live."}
               </p>
             )}
-          </div>
-        </section>
+          </section>
+        </div>
       </div>
     </Container>
   );

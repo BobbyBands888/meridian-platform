@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ContactForm } from "@/components/contact-form";
+import { areaBySlug } from "@/lib/areas";
 import { Check } from "@/components/photo-card";
 import { Container } from "@/components/ui";
 import { getDisclosureGuidePath } from "@/lib/guides";
@@ -9,6 +10,7 @@ import { formatPrice, formatSpecs, listingLocation, listingPath, listingSummary,
 import { requireMarket } from "@/lib/market-data";
 import { brandName } from "@/lib/markets";
 import { getPublicListing } from "@/lib/public-listings";
+import { AreaPage, areaMetadata } from "./area-page";
 import { ListingGallery } from "./listing-gallery";
 
 export const revalidate = 300;
@@ -21,6 +23,8 @@ export function generateStaticParams() {
 export async function generateMetadata({ params }: PageProps<"/[market]/homes/[slug]">): Promise<Metadata> {
   const { market: marketSlug, slug } = await params;
   const market = await requireMarket(marketSlug);
+  const area = areaBySlug(market, slug);
+  if (area) return areaMetadata(market, area);
   const result = await getPublicListing(market.id, slug);
   if (!result) return {};
   const { listing, photos } = result;
@@ -39,9 +43,16 @@ export async function generateMetadata({ params }: PageProps<"/[market]/homes/[s
   };
 }
 
+/**
+ * One segment serves two kinds of page: a neighborhood ("east-nashville") and a listing. Area slugs win, and they
+ * can't collide: every listing slug ends in its five-digit ZIP, which no area name does.
+ */
 export default async function ListingPage({ params }: PageProps<"/[market]/homes/[slug]">) {
   const { market: marketSlug, slug } = await params;
   const market = await requireMarket(marketSlug);
+  const area = areaBySlug(market, slug);
+  if (area) return <AreaPage market={market} area={area} />;
+
   const [result, disclosureGuide] = await Promise.all([getPublicListing(market.id, slug), getDisclosureGuidePath(market.slug)]);
   if (!result) notFound(); // The layout already 404s; this narrows the type.
   const { listing, photos } = result;

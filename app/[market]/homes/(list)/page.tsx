@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { CardGrid } from "@/components/photo-card";
 import { ButtonLink, Container, EmptyState, PageHeader } from "@/components/ui";
 import { ListingAlertsForm } from "@/components/listing-alerts-form";
@@ -55,9 +56,14 @@ export default async function HomesPage({ params: routeParams, searchParams }: P
       <Container>
         <HomeFilters zipGroups={zipGroups(market)} values={{ q, zip, min_price: str(params.min_price), max_price: str(params.max_price), beds: str(params.beds), baths: str(params.baths) }} />
 
-        <p className="mb-6 mt-8 text-[15px] text-muted" aria-live="polite">
-          {listings.length === 0 ? "" : `${listings.length} ${listings.length === 1 ? "home" : "homes"}${filtered ? " match your filters" : " for sale"}`}
-        </p>
+        <div className="mb-6 mt-8 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
+          <p className="text-[15px] text-muted" aria-live="polite">
+            {listings.length === 0 ? "" : `${listings.length} ${listings.length === 1 ? "home" : "homes"}${filtered ? " match your filters" : " for sale"}`}
+          </p>
+          <Link href="/homes/areas" className="text-[15px] font-semibold text-forest hover:underline">
+            Browse by neighborhood <span aria-hidden="true">→</span>
+          </Link>
+        </div>
 
         {listings.length > 0 ? (
           <CardGrid>

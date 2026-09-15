@@ -6,13 +6,18 @@ import { Check } from "@/components/photo-card";
 import { Turnstile, type TurnstileHandle } from "@/components/turnstile";
 import { Button } from "@/components/ui";
 
-type Props = { defaultZip?: string; submitLabel?: string };
+type Props = {
+  defaultZip?: string;
+  submitLabel?: string;
+  /** When set, the ZIP field becomes a menu of these ZIPs, for a page about one area. */
+  zipOptions?: { zip: string; label: string }[];
+};
 
 /**
  * Email + optional ZIP signup for new-listing alerts. Turnstile's script loads only once someone starts using the
  * form, so pages that show it (like the home page) don't pay for it on every visit.
  */
-export function ListingAlertsForm({ defaultZip = "", submitLabel = "Get listing alerts" }: Props) {
+export function ListingAlertsForm({ defaultZip = "", submitLabel = "Get listing alerts", zipOptions }: Props) {
   const [state, formAction, pending] = useActionState<AlertSignupState, FormData>(subscribeToListingAlerts, {});
   const [armed, setArmed] = useState(false);
   const [waiting, setWaiting] = useState(false);
@@ -108,23 +113,41 @@ export function ListingAlertsForm({ defaultZip = "", submitLabel = "Get listing 
             </p>
           )}
         </div>
-        <div className="sm:w-40">
+        <div className={zipOptions ? "sm:w-56" : "sm:w-40"}>
           <label htmlFor={`${id}-zip`} className="sr-only">
             ZIP code (optional)
           </label>
-          <input
-            id={`${id}-zip`}
-            name="zip"
-            type="text"
-            autoComplete="postal-code"
-            inputMode="numeric"
-            placeholder="ZIP (optional)"
-            maxLength={5}
-            defaultValue={values?.zip ?? defaultZip}
-            aria-invalid={Boolean(errors.zip) || undefined}
-            aria-describedby={errors.zip ? `${id}-zip-error` : undefined}
-            className={inputClass}
-          />
+          {zipOptions ? (
+            <select
+              id={`${id}-zip`}
+              name="zip"
+              defaultValue={values?.zip ?? defaultZip}
+              aria-invalid={Boolean(errors.zip) || undefined}
+              aria-describedby={errors.zip ? `${id}-zip-error` : undefined}
+              className={inputClass}
+            >
+              {zipOptions.map((option) => (
+                <option key={option.zip} value={option.zip}>
+                  {option.label}
+                </option>
+              ))}
+              <option value="">Everywhere else too</option>
+            </select>
+          ) : (
+            <input
+              id={`${id}-zip`}
+              name="zip"
+              type="text"
+              autoComplete="postal-code"
+              inputMode="numeric"
+              placeholder="ZIP (optional)"
+              maxLength={5}
+              defaultValue={values?.zip ?? defaultZip}
+              aria-invalid={Boolean(errors.zip) || undefined}
+              aria-describedby={errors.zip ? `${id}-zip-error` : undefined}
+              className={inputClass}
+            />
+          )}
           {errors.zip && (
             <p id={`${id}-zip-error`} className="mt-1.5 text-[14px] text-red-700">
               {errors.zip}
