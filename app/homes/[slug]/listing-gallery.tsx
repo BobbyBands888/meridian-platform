@@ -45,6 +45,7 @@ export function ListingGallery({ photos, alt }: { photos: Photo[]; alt: string }
             <div
               key={photo.id}
               className="relative aspect-[4/3] w-full shrink-0 snap-center bg-surface sm:aspect-[16/9]"
+              role="group"
               aria-roledescription="slide"
               aria-label={`${i + 1} of ${photos.length}`}
             >
