@@ -99,6 +99,15 @@ type LeadRow = {
   created_at: string;
 };
 
+type ListingAlertRow = {
+  id: string;
+  email: string;
+  zip: string | null;
+  unsubscribe_token: string;
+  created_at: string;
+  unsubscribed_at: string | null;
+};
+
 type VendorCertificationRow = {
   vendor_id: string;
   licensed: boolean;
@@ -149,6 +158,12 @@ export type Database = {
         Insert: Omit<LeadRow, "id" | "created_at" | "sender_phone" | "source"> &
           Partial<Pick<LeadRow, "id" | "created_at" | "sender_phone" | "source">>;
         Update: Partial<LeadRow>;
+        Relationships: [];
+      };
+      listing_alerts: {
+        Row: ListingAlertRow;
+        Insert: Pick<ListingAlertRow, "email"> & Partial<ListingAlertRow>;
+        Update: Partial<ListingAlertRow>;
         Relationships: [];
       };
       vendor_certifications: {
@@ -251,4 +266,5 @@ export type PublicVendor = Database["public"]["Views"]["public_vendors"]["Row"];
 export type Listing = ListingRow;
 export type ListingPhoto = ListingPhotoRow;
 export type PublicListing = Database["public"]["Views"]["public_listings"]["Row"];
+export type ListingAlert = ListingAlertRow;
 export type Lead = LeadRow;

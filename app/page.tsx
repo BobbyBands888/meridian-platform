@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ListingAlertsForm } from "@/components/listing-alerts-form";
 import { ListingCard } from "@/components/listing-card";
 import { CardGrid } from "@/components/photo-card";
 import { SearchBar } from "@/components/search-bar";
@@ -26,6 +27,27 @@ const steps = [
   {
     title: "Everyone hires their own pros",
     body: "Find attorneys, inspectors, and lenders in our directory. You choose them and you sign with them.",
+  },
+];
+
+const tools = [
+  {
+    href: "/sell/checklist",
+    title: "Pre-sale checklist",
+    body: "37 steps from getting ready to list through closing day, with your progress saved as you go.",
+    cta: "Open the checklist",
+  },
+  {
+    href: "/guides",
+    title: "Tennessee guides",
+    body: "Plain-English guides to selling without an agent and completing the state disclosure form.",
+    cta: "Read the guides",
+  },
+  {
+    href: "/vendors",
+    title: "Vendor directory",
+    body: "Local attorneys, inspectors, photographers, and other pros you contact and hire directly.",
+    cta: "Browse vendors",
   },
 ];
 
@@ -65,6 +87,22 @@ export default async function HomePage() {
         </section>
       )}
 
+      <section aria-labelledby="alerts-heading">
+        <Container className="pt-16 sm:pt-20">
+          <div className="rounded-3xl bg-surface px-6 py-10 sm:px-10">
+            <h2 id="alerts-heading" className="text-2xl font-bold tracking-tight sm:text-3xl">
+              Get new Nashville FSBO listings by email
+            </h2>
+            <p className="mt-3 max-w-2xl text-[17px] leading-relaxed text-muted">
+              Hear when owners list new homes. Add a ZIP to focus on one area, or leave it blank for all of Middle Tennessee.
+            </p>
+            <div className="mt-6 max-w-3xl">
+              <ListingAlertsForm />
+            </div>
+          </div>
+        </Container>
+      </section>
+
       <section aria-labelledby="how-heading">
         <Container className="py-16 sm:py-20">
           <h2 id="how-heading" className="text-3xl font-bold tracking-tight sm:text-4xl">
@@ -79,6 +117,30 @@ export default async function HomePage() {
               </li>
             ))}
           </ol>
+        </Container>
+      </section>
+
+      <section aria-labelledby="tools-heading">
+        <Container className="pb-16 sm:pb-20">
+          <h2 id="tools-heading" className="text-3xl font-bold tracking-tight sm:text-4xl">
+            Free tools for selling yourself
+          </h2>
+          <ul className="mt-10 grid gap-4 md:grid-cols-3">
+            {tools.map((tool) => (
+              <li key={tool.href}>
+                <Link
+                  href={tool.href}
+                  className="group flex h-full flex-col rounded-2xl border border-line bg-white p-6 transition-colors hover:border-forest"
+                >
+                  <h3 className="text-xl font-semibold tracking-tight group-hover:text-forest">{tool.title}</h3>
+                  <p className="mt-2 flex-1 text-[17px] leading-relaxed text-muted">{tool.body}</p>
+                  <span className="mt-5 text-[15px] font-semibold text-forest">
+                    {tool.cta} <span aria-hidden="true">→</span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
         </Container>
       </section>
 
@@ -118,7 +180,7 @@ export default async function HomePage() {
       )}
 
       <section aria-labelledby="sell-heading">
-        <Container className="py-16 sm:py-24">
+        <Container className="pb-10 pt-16 sm:pt-24">
           <div className="rounded-3xl bg-forest px-6 py-12 text-white sm:px-12 sm:py-16">
             <h2 id="sell-heading" className="max-w-2xl text-3xl font-bold tracking-tight sm:text-4xl">
               Selling your Nashville home yourself?
@@ -128,13 +190,21 @@ export default async function HomePage() {
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <ButtonLink href="/sell">List your home</ButtonLink>
-              <ButtonLink href="/guides" variant="secondary" className="border-white/30 bg-transparent text-white hover:border-white hover:text-white">
+              <ButtonLink href="/guides" variant="onDark">
                 Read the guides
               </ButtonLink>
             </div>
           </div>
         </Container>
       </section>
+
+      <Container>
+        <p className="text-center text-[17px]">
+          <Link href="/vendors/join" className="font-semibold text-forest underline-offset-2 hover:underline">
+            Nashville pro? Join the directory free during launch <span aria-hidden="true">→</span>
+          </Link>
+        </p>
+      </Container>
     </>
   );
 }

@@ -97,7 +97,8 @@ export default function LegalPage() {
             <p className="mt-6">
               We collect the information you give us (name, email, phone, listing details, messages) and basic usage
               analytics. We use it to operate the site, deliver your inquiries to the people you contact, and send you
-              service emails. We do not sell your personal information. Contact details are never displayed publicly;
+              service emails. If you sign up for listing alerts, we&apos;ll email you when new homes are listed; every alert
+              includes an unsubscribe link. We do not sell your personal information. Contact details are never displayed publicly;
               they are shared only with the specific person you choose to contact through a form. You can request
               deletion of your account and data by emailing <Mail />.
             </p>

@@ -25,7 +25,7 @@ export function siteLink(path: string) {
   return `${site.url}${path}`;
 }
 
-type EmailBlock = { kind: "p"; text: string } | { kind: "button"; label: string; href: string } | { kind: "quote"; text: string } | { kind: "rows"; rows: [string, string][] };
+type EmailBlock = { kind: "p"; text: string; link?: { label: string; href: string } } | { kind: "button"; label: string; href: string } | { kind: "quote"; text: string } | { kind: "rows"; rows: [string, string][] };
 
 type SendArgs = {
   to: string | string[];
@@ -33,6 +33,7 @@ type SendArgs = {
   heading: string;
   blocks: EmailBlock[];
   replyTo?: string;
+  headers?: Record<string, string>;
 };
 
 function renderHtml(heading: string, blocks: EmailBlock[]) {
@@ -40,7 +41,9 @@ function renderHtml(heading: string, blocks: EmailBlock[]) {
     .map((b) => {
       switch (b.kind) {
         case "p":
-          return `<p style="margin:0 0 16px;font-size:16px;line-height:1.6;color:#111">${escapeHtml(b.text)}</p>`;
+          return `<p style="margin:0 0 16px;font-size:16px;line-height:1.6;color:#111">${escapeHtml(b.text)}${
+            b.link ? ` <a href="${escapeHtml(b.link.href)}" style="color:#1F4D3A;text-decoration:underline">${escapeHtml(b.link.label)}</a>` : ""
+          }</p>`;
         case "quote":
           return `<div style="margin:0 0 16px;padding:12px 16px;border-left:3px solid #1F4D3A;background:#f6f6f4;font-size:16px;line-height:1.6;color:#111;white-space:pre-wrap">${escapeHtml(b.text)}</div>`;
         case "button":
@@ -69,7 +72,7 @@ function renderText(heading: string, blocks: EmailBlock[]) {
     .map((b) => {
       switch (b.kind) {
         case "p":
-          return b.text;
+          return b.link ? `${b.text} ${b.link.label}: ${b.link.href}` : b.text;
         case "quote":
           return b.text
             .split("\n")
@@ -86,7 +89,7 @@ function renderText(heading: string, blocks: EmailBlock[]) {
 }
 
 /** Sends one transactional email. Returns false (and logs) instead of throwing, so a mail outage never loses a submission. */
-export async function sendEmail({ to, subject, heading, blocks, replyTo }: SendArgs): Promise<boolean> {
+export async function sendEmail({ to, subject, heading, blocks, replyTo, headers }: SendArgs): Promise<boolean> {
   try {
     const { error } = await resend().emails.send({
       from: FROM,
@@ -95,6 +98,7 @@ export async function sendEmail({ to, subject, heading, blocks, replyTo }: SendA
       html: renderHtml(heading, blocks),
       text: renderText(heading, blocks),
       replyTo,
+      headers,
     });
     if (error) {
       console.error("email send failed", subject, error.name, error.message);

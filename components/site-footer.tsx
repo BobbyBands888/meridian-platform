@@ -2,6 +2,7 @@ import Link from "next/link";
 import { site } from "@/lib/site";
 
 const footerLinks = [
+  { href: "/about", label: "About" },
   { href: "/legal", label: "Legal" },
   { href: "/legal#privacy", label: "Privacy" },
   { href: "/legal#fair-housing", label: "Fair Housing" },

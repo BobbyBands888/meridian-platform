@@ -6,7 +6,7 @@ import { getActiveVendorCategories } from "@/lib/public-vendors";
 export const revalidate = 300;
 
 export const metadata: Metadata = {
-  title: "Vetted Nashville real estate vendors",
+  title: "Nashville vendors for direct sales",
   description:
     "Find Nashville real estate attorneys, home inspectors, photographers, painters, stagers, handymen, lenders, and home insurance agents. Contact them directly through Nashville Buys.",
   alternates: { canonical: "/vendors" },
@@ -19,7 +19,7 @@ export default async function VendorsPage() {
   return (
     <>
       <PageHeader
-        title="Vetted Nashville vendors"
+        title="Nashville vendors for direct sales"
         intro="Independent professionals for buying and selling direct. Each one certifies they are licensed and insured, and you contract with them yourself."
       />
       <Container>

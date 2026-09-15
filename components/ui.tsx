@@ -9,6 +9,9 @@ const variants = {
   primary: "bg-warm text-ink hover:bg-warm-dark",
   secondary: "border border-ink/15 bg-white text-ink hover:border-forest hover:text-forest",
   forest: "bg-forest text-white hover:bg-forest-dark",
+  // Outline button for dark backgrounds. Overriding secondary's colors with className doesn't work reliably, since
+  // Tailwind orders utilities by its own rules, not by their order in the class string.
+  onDark: "border border-white/40 bg-transparent text-white hover:border-white hover:bg-white/10",
 } as const;
 
 type Variant = keyof typeof variants;
@@ -65,12 +68,13 @@ export function Container({ children, className = "" }: { children: ReactNode; c
   return <div className={`mx-auto max-w-6xl px-4 sm:px-6 ${className}`}>{children}</div>;
 }
 
-export function EmptyState({ title, children, actions }: { title: string; children?: ReactNode; actions?: ReactNode }) {
+export function EmptyState({ title, children, actions, footer }: { title: string; children?: ReactNode; actions?: ReactNode; footer?: ReactNode }) {
   return (
     <div className="rounded-2xl border border-dashed border-line px-6 py-14 text-center">
       <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
       {children && <div className="mx-auto mt-2 max-w-md text-[15px] leading-relaxed text-muted">{children}</div>}
       {actions && <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">{actions}</div>}
+      {footer && <div className="mx-auto mt-10 max-w-2xl border-t border-line pt-8 text-left">{footer}</div>}
     </div>
   );
 }

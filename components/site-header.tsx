@@ -25,9 +25,10 @@ export function SiteHeader() {
     <header className="sticky top-0 z-50 border-b border-line bg-white/95 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
         <Link href="/" className="flex items-center gap-2">
-          <span className="text-xl font-bold tracking-tight text-forest">{site.name}</span>
-          <span className="rounded border border-line px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wider text-muted">
-            Nashville
+          <span className="whitespace-nowrap text-xl font-bold tracking-tight text-forest">{site.name}</span>
+          {/* The location tag drops out on the narrowest phones so the name stays on one line. */}
+          <span className="whitespace-nowrap rounded border max-[359px]:hidden border-line px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wider text-muted">
+            Middle Tennessee
           </span>
         </Link>
 

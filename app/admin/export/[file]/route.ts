@@ -1,5 +1,6 @@
+import { areaForZip } from "@/lib/areas";
 import { getCurrentProfile } from "@/lib/auth";
-import type { Lead } from "@/lib/database.types";
+import type { Lead, ListingAlert } from "@/lib/database.types";
 import { attachLeadTargets } from "@/lib/leads";
 import { formatUsPhone } from "@/lib/phone";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -71,12 +72,24 @@ async function leadsCsv() {
   return toCsv(header, rows);
 }
 
+async function alertsCsv() {
+  const admin = createAdminClient();
+  const alerts = await fetchAll<Pick<ListingAlert, "email" | "zip" | "created_at" | "unsubscribed_at">>((from, to) =>
+    admin.from("listing_alerts").select("email, zip, created_at, unsubscribed_at").order("created_at", { ascending: false }).range(from, to),
+  );
+  const header = ["email", "zip", "area", "status", "signed_up_at", "unsubscribed_at"];
+  const rows = alerts.map((a) => [
+    a.email, a.zip, a.zip ? areaForZip(a.zip) : "", a.unsubscribed_at ? "unsubscribed" : "active", chicago(a.created_at), chicago(a.unsubscribed_at),
+  ]);
+  return toCsv(header, rows);
+}
+
 export async function GET(_request: Request, { params }: RouteContext<"/admin/export/[file]">) {
   const profile = await getCurrentProfile();
   if (!profile?.is_admin) return new Response("Not found", { status: 404 });
 
   const { file } = await params;
-  const builders: Record<string, () => Promise<string>> = { "vendors.csv": vendorsCsv, "leads.csv": leadsCsv };
+  const builders: Record<string, () => Promise<string>> = { "vendors.csv": vendorsCsv, "leads.csv": leadsCsv, "alerts.csv": alertsCsv };
   const build = builders[file];
   if (!build) return new Response("Not found", { status: 404 });
 

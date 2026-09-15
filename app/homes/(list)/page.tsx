@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { CardGrid } from "@/components/photo-card";
 import { ButtonLink, Container, EmptyState, PageHeader } from "@/components/ui";
+import { ListingAlertsForm } from "@/components/listing-alerts-form";
 import { ListingCard } from "@/components/listing-card";
 import { zipsForSearch } from "@/lib/areas";
 import { getActiveListings, type ListingFilters } from "@/lib/public-listings";
@@ -39,6 +40,8 @@ export default async function HomesPage({ searchParams }: PageProps<"/homes">) {
   }
 
   const listings = unmatchedSearch ? [] : await getActiveListings(filters);
+  // Prefill the alert ZIP when the visitor searched for one ZIP code.
+  const alertZip = /^\d{5}$/.test(zip) ? zip : filters.zips?.length === 1 ? filters.zips[0] : "";
   const filtered = Boolean(q || zip || filters.minPrice || filters.maxPrice || filters.beds || filters.baths);
 
   return (
@@ -69,6 +72,15 @@ export default async function HomesPage({ searchParams }: PageProps<"/homes">) {
                   </ButtonLink>
                 )}
               </>
+            }
+            footer={
+              <section aria-labelledby="homes-alerts-heading">
+                <h3 id="homes-alerts-heading" className="text-lg font-semibold tracking-tight">
+                  Get new Nashville FSBO listings by email
+                </h3>
+                <p className="mb-4 mt-1 text-[15px] leading-relaxed text-muted">We&apos;ll let you know when owners list new homes.</p>
+                <ListingAlertsForm defaultZip={alertZip} />
+              </section>
             }
           >
             {filtered

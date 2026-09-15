@@ -45,12 +45,16 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
   const notice = notices[String(params.done ?? "")];
 
   const admin = createAdminClient();
-  const [vendorsCount, editsCount, listingsCount, leadsCount] = await Promise.all([
+  const [vendorsCount, editsCount, listingsCount, leadsCount, alertsActive, alertsTotal] = await Promise.all([
     admin.from("vendors").select("id", { count: "exact", head: true }).eq("status", "pending"),
     admin.from("vendor_pending_edits").select("vendor_id", { count: "exact", head: true }),
     admin.from("listings").select("id", { count: "exact", head: true }).eq("status", "pending"),
     admin.from("leads").select("id", { count: "exact", head: true }),
+    admin.from("listing_alerts").select("id", { count: "exact", head: true }).is("unsubscribed_at", null),
+    admin.from("listing_alerts").select("id", { count: "exact", head: true }),
   ]);
+  const alertSubscribers = alertsActive.count ?? 0;
+  const alertUnsubscribed = (alertsTotal.count ?? 0) - alertSubscribers;
   const counts: Record<Tab, number> = {
     vendors: (vendorsCount.count ?? 0) + (editsCount.count ?? 0),
     listings: listingsCount.count ?? 0,
@@ -60,13 +64,22 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
   return (
     <Container className="py-12 sm:py-16">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <h1 className="text-4xl font-bold tracking-tight">Admin</h1>
+        <div>
+          <h1 className="text-4xl font-bold tracking-tight">Admin</h1>
+          <p className="mt-2 text-[15px] text-muted">
+            Listing alert signups: <strong className="font-semibold text-ink">{alertSubscribers.toLocaleString("en-US")}</strong> active
+            {alertUnsubscribed > 0 ? ` · ${alertUnsubscribed.toLocaleString("en-US")} unsubscribed` : ""}
+          </p>
+        </div>
         <div className="flex flex-wrap gap-4 text-[15px]">
           <a href="/admin/export/vendors.csv" className="font-medium text-forest underline underline-offset-2">
             Export vendors (CSV)
           </a>
           <a href="/admin/export/leads.csv" className="font-medium text-forest underline underline-offset-2">
             Export leads (CSV)
+          </a>
+          <a href="/admin/export/alerts.csv" className="font-medium text-forest underline underline-offset-2">
+            Export listing alerts (CSV)
           </a>
         </div>
       </div>

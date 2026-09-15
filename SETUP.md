@@ -40,6 +40,7 @@ Run each file in `supabase/migrations/` in filename order, once each (re-running
 3. `20260916000000_listings.sql` (Phase 4: listings, stager and home insurance categories, category edits held for review)
 4. `20260917000000_listing_city.sql` (Phase 4: listing city for Middle Tennessee ZIP codes)
 5. `20260918000000_vendor_verification.sql` (Verified vendor tier and the private `vendor-documents` bucket)
+6. `20260919000000_listing_alerts.sql` (Buyer listing alert signups; server-only table)
 
 If you ever re-run an earlier file, re-run every later file after it too, since later files replace some of its functions.
 
@@ -176,7 +177,8 @@ vendorCategories: [attorney, home_inspector]
 ## Admin
 
 - `/admin` has three tabs: **Pending Vendors** (new applications and edits to live profiles), **Pending Listings**, and **All Leads**. Approve and reject buttons send the matching email. Open a row's Review page to add a note to a rejection.
-- **Export vendors (CSV)** and **Export leads (CSV)** download everything, including contact details. Treat the files as private.
+- **Export vendors (CSV)**, **Export leads (CSV)**, and **Export listing alerts (CSV)** download everything, including contact details. Treat the files as private.
+- **Listing alert signups** (under the Admin heading) counts active buyer signups from the home page and /homes. Signups are only collected for now: each gets a confirmation email with an unsubscribe link, and no alert emails are sent yet.
 
 ## Vercel
 
