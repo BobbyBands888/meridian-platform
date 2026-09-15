@@ -39,6 +39,7 @@ Run each file in `supabase/migrations/` in filename order, once each (re-running
 2. `20260915000000_vendor_directory.sql` (Phase 3: vendor signup, held edits)
 3. `20260916000000_listings.sql` (Phase 4: listings, stager and home insurance categories, category edits held for review)
 4. `20260917000000_listing_city.sql` (Phase 4: listing city for Middle Tennessee ZIP codes)
+5. `20260918000000_vendor_verification.sql` (Verified vendor tier and the private `vendor-documents` bucket)
 
 If you ever re-run an earlier file, re-run every later file after it too, since later files replace some of its functions.
 

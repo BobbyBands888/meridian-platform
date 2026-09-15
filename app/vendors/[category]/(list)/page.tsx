@@ -53,7 +53,12 @@ export default async function VendorCategoryPage({ params }: PageProps<"/vendors
   if (slug !== ALL.slug && !category) notFound(); // The layout already 404s; this narrows the type.
 
   const supabase = createPublicClient({ tags: [CACHE_TAGS.vendors] });
-  let query = supabase.from("public_vendors").select("*").order("created_at", { ascending: true });
+  // Verified vendors first, then by join date.
+  let query = supabase
+    .from("public_vendors")
+    .select("*")
+    .order("verified_at", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: true });
   if (category) query = query.eq("category", category.value);
   const { data: vendors, error } = await query;
   if (error) throw new Error(`Could not load vendors: ${error.message}`);

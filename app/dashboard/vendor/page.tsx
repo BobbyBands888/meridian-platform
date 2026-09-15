@@ -7,6 +7,8 @@ import { ButtonLink, Container } from "@/components/ui";
 import { requireProfile } from "@/lib/auth";
 import { getInquiries, getInquiryCounts } from "@/lib/leads";
 import { formatUsPhone } from "@/lib/phone";
+import { formatReviewDate, licenseRequired, verifiedBadgeText } from "@/lib/verification";
+import { VerificationCard } from "./verification-card";
 import { createClient } from "@/lib/supabase/server";
 import { categoryByValue, vendorPath } from "@/lib/vendors";
 
@@ -32,8 +34,9 @@ export default async function VendorDashboardPage({ searchParams }: PageProps<"/
   const supabase = await createClient();
   const { data: vendor } = await supabase.from("vendors").select("*").eq("profile_id", profile.id).maybeSingle();
   if (!vendor) redirect("/vendors/join");
-  const [{ data: pending }, counts, inquiries] = await Promise.all([
+  const [{ data: pending }, { data: verification }, counts, inquiries] = await Promise.all([
     supabase.from("vendor_pending_edits").select("*").eq("vendor_id", vendor.id).maybeSingle(),
+    supabase.from("vendor_verifications").select("license_number, coi_file_name, submitted_at, verified_at").eq("vendor_id", vendor.id).maybeSingle(),
     getInquiryCounts("vendor", vendor.id),
     getInquiries("vendor", vendor.id),
   ]);
@@ -104,6 +107,19 @@ export default async function VendorDashboardPage({ searchParams }: PageProps<"/
         )}
         {inquiries.length >= 100 && <p className="mt-3 text-[13px] text-muted">Showing your 100 most recent inquiries.</p>}
       </section>
+
+      {vendor.status === "approved" && (
+        <div className="mt-6">
+          <VerificationCard
+            userId={profile.id}
+            categoryLabel={category.label}
+            licenseRequired={licenseRequired(vendor.category)}
+            submission={verification}
+            submittedLabel={verification?.submitted_at ? formatReviewDate(verification.submitted_at) : null}
+            badgeText={verification?.verified_at ? verifiedBadgeText(verification.verified_at) : null}
+          />
+        </div>
+      )}
 
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
         <section aria-labelledby="status-heading" className="rounded-2xl border border-line p-6">

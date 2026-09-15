@@ -1,5 +1,6 @@
 import "server-only";
 import { adminEmail, sendEmail, siteLink } from "@/lib/email";
+import { verifiedBadgeText } from "@/lib/verification";
 import { categoryByValue, vendorPath } from "@/lib/vendors";
 import type { VendorCategoryValue } from "@/lib/database.types";
 
@@ -52,6 +53,36 @@ export function sendVendorApproved(to: string, vendor: VendorInfo) {
     heading: "You're live on Nashville Buys",
     blocks: [
       { kind: "p", text: `${vendor.business_name} is now listed under ${categoryByValue(vendor.category).label}. Buyers and sellers can contact you through the form on your profile, and inquiries arrive by email.` },
+      { kind: "button", label: "See your profile", href: siteLink(vendorPath(vendor)) },
+      {
+        kind: "p",
+        text: "Want to stand out? Get the Verified badge: add your license number and certificate of insurance from your vendor dashboard. Once we review them, your profile shows \"License and insurance documents reviewed by Nashville Buys\" with the review date, and verified vendors are listed first in your category.",
+      },
+      { kind: "p", text: `Vendor dashboard: ${siteLink("/dashboard/vendor")}` },
+    ],
+  });
+}
+
+export function sendAdminVerificationSubmitted(vendor: { id: string; business_name: string; email: string }, resubmitted: boolean) {
+  return sendEmail({
+    to: adminEmail(),
+    subject: `${resubmitted ? "Updated" : "New"} verification documents: ${vendor.business_name}`,
+    heading: `${vendor.business_name} ${resubmitted ? "updated their" : "sent"} verification documents`,
+    blocks: [
+      { kind: "rows", rows: [["Business", vendor.business_name], ["Account", vendor.email]] },
+      { kind: "button", label: "Review documents", href: siteLink(`/admin/vendors/${vendor.id}#verification`) },
+    ],
+  });
+}
+
+export function sendVendorVerified(to: string, vendor: VendorInfo, verifiedAt: string) {
+  return sendEmail({
+    to,
+    subject: "Your Verified badge is live",
+    heading: "You're verified",
+    blocks: [
+      { kind: "p", text: `We reviewed the license and insurance documents for ${vendor.business_name}. Your profile now shows: "${verifiedBadgeText(verifiedAt)}", and you're listed first in your category.` },
+      { kind: "p", text: "When your insurance renews, upload the new certificate from your vendor dashboard so we can review it again." },
       { kind: "button", label: "See your profile", href: siteLink(vendorPath(vendor)) },
     ],
   });

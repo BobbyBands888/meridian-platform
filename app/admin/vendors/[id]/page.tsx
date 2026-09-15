@@ -8,7 +8,8 @@ import { requireAdmin } from "@/lib/auth";
 import { formatUsPhone } from "@/lib/phone";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { categoryByValue, vendorPath } from "@/lib/vendors";
-import { approveVendor, approveVendorEdit, declineVendorEdit, rejectVendor } from "../../actions";
+import { COI_BUCKET, formatReviewDate, licenseRequired, verifiedBadgeText } from "@/lib/verification";
+import { approveVendor, approveVendorEdit, declineVendorEdit, rejectVendor, saveVerification } from "../../actions";
 import { SubmitButton } from "../../submit-button";
 
 export const metadata: Metadata = {
@@ -22,6 +23,10 @@ const done: Record<string, string> = {
   "edit-approved": "Edit approved. The changes are live and the vendor was emailed.",
   "edit-declined": "Edit declined. The vendor was emailed and their current profile is unchanged.",
   already: "That was already handled, so no email was sent again.",
+  verified: "Marked as verified. The badge is live and the vendor was emailed.",
+  unverified: "Verification removed. The badge is no longer shown.",
+  "verification-saved": "Verification review saved.",
+  "verify-incomplete": "Your review steps and notes were saved. Check all three steps to mark the vendor as verified.",
 };
 
 const certLabels = {
@@ -45,6 +50,11 @@ export default async function AdminVendorPage({ params, searchParams }: PageProp
     .maybeSingle();
   if (!vendor) notFound();
 
+  const { data: verification } = await admin.from("vendor_verifications").select("*").eq("vendor_id", vendor.id).maybeSingle();
+  // Certificates live in a private bucket; link through a short-lived signed URL.
+  const coiUrl = verification?.coi_path
+    ? (await admin.storage.from(COI_BUCKET).createSignedUrl(verification.coi_path, 600)).data?.signedUrl ?? null
+    : null;
   const cert = vendor.vendor_certifications;
   const pending = vendor.vendor_pending_edits;
   const category = categoryByValue(vendor.category);
@@ -121,6 +131,95 @@ export default async function AdminVendorPage({ params, searchParams }: PageProp
             </div>
           </section>
         )}
+
+        <section id="verification" aria-labelledby="verification-heading" className="scroll-mt-24 rounded-2xl border border-line p-6 lg:col-span-2">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
+            <h2 id="verification-heading" className="text-lg font-semibold">
+              Verification
+            </h2>
+            <p className="text-[14px] text-muted">
+              {verification?.verified_at ? verifiedBadgeText(verification.verified_at) : "Not verified"}
+            </p>
+          </div>
+
+          {verification?.submitted_at ? (
+            <dl className="mt-4 grid gap-3 text-[15px] sm:grid-cols-3">
+              <div>
+                <dt className="text-muted">License number</dt>
+                <dd className="break-words">{verification.license_number ?? (licenseRequired(vendor.category) ? "Missing" : "Not provided")}</dd>
+              </div>
+              <div>
+                <dt className="text-muted">Certificate of insurance</dt>
+                <dd>
+                  {coiUrl ? (
+                    <a href={coiUrl} target="_blank" rel="noopener noreferrer" className="break-all font-medium text-forest underline underline-offset-2">
+                      {verification.coi_file_name ?? "Open file"}
+                    </a>
+                  ) : (
+                    "File not found"
+                  )}
+                  <span className="block text-[12px] text-muted">Private link, expires in 10 minutes</span>
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted">Submitted</dt>
+                <dd>
+                  {formatReviewDate(verification.submitted_at)}
+                  {verification.verified_at && verification.submitted_at > verification.verified_at && (
+                    <span className="block text-[13px] font-medium text-warm-dark">New documents since last review</span>
+                  )}
+                </dd>
+              </div>
+            </dl>
+          ) : (
+            <p className="mt-3 text-[15px] text-muted">The vendor hasn&apos;t submitted verification documents.</p>
+          )}
+
+          <form action={saveVerification} className="mt-6 space-y-4 border-t border-line pt-5">
+            <input type="hidden" name="vendor_id" value={vendor.id} />
+            <fieldset>
+              <legend className="text-[15px] font-medium">Review steps</legend>
+              <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                {[
+                  { name: "license_checked", label: "License checked", checked: verification?.license_checked },
+                  { name: "coi_reviewed", label: "COI reviewed", checked: verification?.coi_reviewed },
+                  { name: "phone_call_done", label: "Phone call done", checked: verification?.phone_call_done },
+                ].map((c) => (
+                  <label key={c.name} className="flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border border-line px-4 text-[15px] has-[:checked]:border-forest">
+                    <input type="checkbox" name={c.name} defaultChecked={Boolean(c.checked)} className="h-5 w-5 accent-[#1f4d3a]" />
+                    {c.label}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+            <div>
+              <label htmlFor="admin_notes" className="block text-[15px] font-medium">
+                Private notes
+              </label>
+              <p className="text-[13px] text-muted">Only admins see these.</p>
+              <textarea
+                id="admin_notes"
+                name="admin_notes"
+                rows={3}
+                maxLength={5000}
+                defaultValue={verification?.admin_notes ?? ""}
+                className="mt-1.5 w-full rounded-lg border border-ink/20 px-3 py-2 text-[15px] focus:border-forest focus:outline-none"
+              />
+            </div>
+            <label className="flex cursor-pointer items-center justify-between gap-4 rounded-xl bg-surface px-4 py-3">
+              <span>
+                <span className="block text-[15px] font-semibold">Mark as verified</span>
+                <span className="block text-[13px] text-muted">Shows the badge with today&apos;s date. Requires all three review steps.</span>
+              </span>
+              <span className="relative inline-flex shrink-0 items-center">
+                <input type="checkbox" name="verified" role="switch" defaultChecked={Boolean(verification?.verified_at)} className="peer sr-only" />
+                <span aria-hidden="true" className="h-7 w-12 rounded-full bg-line transition-colors peer-checked:bg-forest peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-forest" />
+                <span aria-hidden="true" className="absolute left-1 h-5 w-5 rounded-full bg-white shadow transition-transform peer-checked:translate-x-5" />
+              </span>
+            </label>
+            <SubmitButton pendingLabel="Saving">Save verification</SubmitButton>
+          </form>
+        </section>
 
         <section aria-labelledby="cert-heading" className="rounded-2xl border border-line p-6">
           <h2 id="cert-heading" className="text-lg font-semibold">

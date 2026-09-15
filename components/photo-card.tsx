@@ -74,8 +74,8 @@ export function PhotoCard({
 /** Quiet trust mark: a small forest-green checkmark and label. */
 export function Check({ label }: { label: string }) {
   return (
-    <span className="inline-flex items-center gap-1.5 text-[13px] text-muted">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1f4d3a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <span className="inline-flex items-start gap-1.5 text-[13px] leading-snug text-muted">
+      <svg className="mt-[2px] shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1f4d3a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d="M5 12.5l4.5 4.5L19 7.5" />
       </svg>
       {label}

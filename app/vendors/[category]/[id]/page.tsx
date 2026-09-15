@@ -7,6 +7,7 @@ import { Check } from "@/components/photo-card";
 import { Container } from "@/components/ui";
 import { getPublicVendor } from "@/lib/public-vendors";
 import { site } from "@/lib/site";
+import { verifiedBadgeText } from "@/lib/verification";
 import { categoryByValue, vendorPath } from "@/lib/vendors";
 
 export const revalidate = 300;
@@ -71,7 +72,7 @@ export default async function VendorProfilePage({ params }: PageProps<"/vendors/
               <h1 className="mt-1 text-4xl font-bold leading-[1.1] tracking-tight">{vendor.business_name}</h1>
               <ul className="mt-4 flex flex-wrap gap-x-4 gap-y-1">
                 <li>
-                  <Check label="Licensed and insured, self-certified" />
+                  <Check label={vendor.verified_at ? verifiedBadgeText(vendor.verified_at) : "Licensed and insured, self-certified"} />
                 </li>
                 {vendor.founding_vendor && (
                   <li>
@@ -107,8 +108,11 @@ export default async function VendorProfilePage({ params }: PageProps<"/vendors/
           </dl>
 
           <p className="mt-8 rounded-xl bg-surface p-4 text-[14px] leading-relaxed text-muted">
-            Vendors are independent businesses. Nashville Buys doesn&apos;t verify licenses or insurance, doesn&apos;t
-            endorse any vendor, and isn&apos;t a party to your agreement. Confirm credentials before you hire.
+            Vendors are independent businesses.{" "}
+            {vendor.verified_at
+              ? "A reviewed-documents badge means we looked at their license and insurance documents on that date; it isn't a guarantee of quality or current standing."
+              : "Nashville Buys hasn't reviewed this vendor's license or insurance documents."}{" "}
+            We don&apos;t endorse any vendor and aren&apos;t a party to your agreement. Confirm credentials before you hire.
           </p>
         </article>
 

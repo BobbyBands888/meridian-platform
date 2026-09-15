@@ -431,7 +431,9 @@ create policy "vendor_certifications: insert own" on public.vendor_certification
 -- Public read views (run with owner privileges; expose only published rows and safe columns)
 -- ---------------------------------------------------------------------------
 
-create or replace view public.public_vendors
+-- Dropped and recreated (not replaced) so re-running this file after a later migration that adds columns still works.
+drop view if exists public.public_vendors;
+create view public.public_vendors
 with (security_barrier = true)
 as
 select

@@ -1,6 +1,7 @@
 import { PhotoCard } from "@/components/photo-card";
 import { ButtonLink } from "@/components/ui";
 import type { PublicVendor } from "@/lib/database.types";
+import { verifiedBadgeText } from "@/lib/verification";
 import { categoryByValue, firstSentence, vendorPath } from "@/lib/vendors";
 
 export function VendorCard({ vendor, priority }: { vendor: PublicVendor; priority?: boolean }) {
@@ -27,7 +28,10 @@ export function VendorCard({ vendor, priority }: { vendor: PublicVendor; priorit
           </div>
         </dl>
       }
-      checks={vendor.founding_vendor ? ["Licensed and insured, self-certified", "Founding vendor"] : ["Licensed and insured, self-certified"]}
+      checks={[
+        vendor.verified_at ? verifiedBadgeText(vendor.verified_at) : "Licensed and insured, self-certified",
+        ...(vendor.founding_vendor ? ["Founding vendor"] : []),
+      ]}
       action={
         <ButtonLink href={`${href}#contact`} variant="secondary" className="sm:w-full" aria-label={`Contact ${vendor.business_name}`}>
           Contact

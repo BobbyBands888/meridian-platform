@@ -32,14 +32,19 @@ const vendorSteps: { category: VendorCategoryValue; heading: string; why: string
 
 const PER_CATEGORY = 3;
 
-// Shuffled each time the page regenerates (every few minutes) so recommendations rotate fairly.
-function pick(vendors: PublicVendor[]) {
-  const copy = [...vendors];
+function shuffle<T>(items: T[]) {
+  const copy = [...items];
   for (let i = copy.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [copy[i], copy[j]] = [copy[j], copy[i]];
   }
-  return copy.slice(0, PER_CATEGORY);
+  return copy;
+}
+
+// Verified vendors come first; each group is shuffled when the page regenerates (every few minutes) so
+// recommendations rotate fairly.
+function pick(vendors: PublicVendor[]) {
+  return [...shuffle(vendors.filter((v) => v.verified_at)), ...shuffle(vendors.filter((v) => !v.verified_at))].slice(0, PER_CATEGORY);
 }
 
 export default async function ChecklistPage() {

@@ -36,7 +36,7 @@ async function vendorsCsv() {
   const vendors = await fetchAll((from, to) =>
     admin
       .from("vendors")
-      .select("*, profiles!inner(full_name, email, phone), vendor_certifications(certified_at), vendor_pending_edits(submitted_at)")
+      .select("*, profiles!inner(full_name, email, phone), vendor_certifications(certified_at), vendor_pending_edits(submitted_at), vendor_verifications(license_number, submitted_at, verified_at)")
       .order("created_at")
       .range(from, to),
   );
@@ -46,12 +46,14 @@ async function vendorsCsv() {
 
   const header = [
     "vendor_id", "business_name", "category", "status", "founding_vendor", "contact_name", "email", "phone",
-    "service_area", "price_range", "website", "leads_all_time", "edit_pending_since", "certified_at", "created_at",
+    "service_area", "price_range", "website", "leads_all_time", "edit_pending_since", "certified_at",
+    "license_number", "verification_submitted_at", "verified_at", "created_at",
   ];
   const rows = vendors.map((v) => [
     v.id, v.business_name, categoryByValue(v.category).singular, v.status, v.founding_vendor ? "yes" : "no",
     v.profiles.full_name, v.profiles.email, formatUsPhone(v.profiles.phone), v.service_area, v.price_range, v.website,
     leadCounts.get(v.id) ?? 0, chicago(v.vendor_pending_edits?.submitted_at), chicago(v.vendor_certifications?.certified_at),
+    v.vendor_verifications?.license_number, chicago(v.vendor_verifications?.submitted_at), chicago(v.vendor_verifications?.verified_at),
     chicago(v.created_at),
   ]);
   return toCsv(header, rows);
@@ -79,7 +81,7 @@ export async function GET(_request: Request, { params }: RouteContext<"/admin/ex
   if (!build) return new Response("Not found", { status: 404 });
 
   const date = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
-  return new Response(`﻿${await build()}`, {
+  return new Response(`\uFEFF${await build()}`, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="nashville-buys-${file.replace(".csv", "")}-${date}.csv"`,

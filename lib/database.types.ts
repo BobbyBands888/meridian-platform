@@ -70,6 +70,20 @@ type VendorPendingEditRow = {
   submitted_at: string;
 };
 
+type VendorVerificationRow = {
+  vendor_id: string;
+  license_number: string | null;
+  coi_path: string | null;
+  coi_file_name: string | null;
+  submitted_at: string | null;
+  license_checked: boolean;
+  coi_reviewed: boolean;
+  phone_call_done: boolean;
+  admin_notes: string | null;
+  verified_at: string | null;
+  updated_at: string;
+};
+
 type ListingPhotoRow = { id: string; listing_id: string; url: string; sort_order: number };
 
 type LeadRow = {
@@ -153,10 +167,18 @@ export type Database = {
           { foreignKeyName: "vendor_pending_edits_vendor_id_fkey"; columns: ["vendor_id"]; isOneToOne: true; referencedRelation: "vendors"; referencedColumns: ["id"] },
         ];
       };
+      vendor_verifications: {
+        Row: VendorVerificationRow;
+        Insert: Pick<VendorVerificationRow, "vendor_id"> & Partial<VendorVerificationRow>;
+        Update: Partial<VendorVerificationRow>;
+        Relationships: [
+          { foreignKeyName: "vendor_verifications_vendor_id_fkey"; columns: ["vendor_id"]; isOneToOne: true; referencedRelation: "vendors"; referencedColumns: ["id"] },
+        ];
+      };
     };
     Views: {
       public_vendors: {
-        Row: Omit<VendorRow, "profile_id" | "status">;
+        Row: Omit<VendorRow, "profile_id" | "status"> & { verified_at: string | null };
         Relationships: [];
       };
       public_listings: {
@@ -207,6 +229,7 @@ export type Database = {
         };
         Returns: { id: string; slug: string }[];
       };
+      submit_vendor_verification: { Args: { p_license_number: string; p_coi_path: string; p_coi_file_name: string }; Returns: string };
       replace_listing_photos: { Args: { p_listing_id: string; p_photo_urls: string[] }; Returns: undefined };
     };
     Enums: {
@@ -223,6 +246,7 @@ export type Database = {
 export type Profile = ProfileRow;
 export type Vendor = VendorRow;
 export type VendorPendingEdit = VendorPendingEditRow;
+export type VendorVerification = VendorVerificationRow;
 export type PublicVendor = Database["public"]["Views"]["public_vendors"]["Row"];
 export type Listing = ListingRow;
 export type ListingPhoto = ListingPhotoRow;

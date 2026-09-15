@@ -6,7 +6,7 @@ import { getCurrentProfile } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CACHE_TAGS } from "@/lib/supabase/public";
 import { sendListingApproved, sendListingRejected } from "@/lib/listing-emails";
-import { sendVendorApproved, sendVendorEditApproved, sendVendorEditDeclined, sendVendorRejected } from "@/lib/vendor-emails";
+import { sendVendorApproved, sendVendorEditApproved, sendVendorEditDeclined, sendVendorRejected, sendVendorVerified } from "@/lib/vendor-emails";
 
 async function assertAdmin() {
   const profile = await getCurrentProfile();
@@ -123,4 +123,43 @@ export async function rejectListing(formData: FormData) {
   await sendListingRejected(listing.profiles.email, listing, note(formData));
   if (wasPublic) refreshListings();
   finish(formData, `/admin/listings/${listingId}`, "rejected");
+}
+
+export async function saveVerification(formData: FormData) {
+  await assertAdmin();
+  const vendorId = String(formData.get("vendor_id"));
+  const { admin, vendor } = await loadVendor(vendorId);
+  const checks = {
+    license_checked: formData.get("license_checked") === "on",
+    coi_reviewed: formData.get("coi_reviewed") === "on",
+    phone_call_done: formData.get("phone_call_done") === "on",
+  };
+  const markVerified = formData.get("verified") === "on";
+  const adminNotes = String(formData.get("admin_notes") ?? "").trim().slice(0, 5000) || null;
+
+  const { data: current } = await admin.from("vendor_verifications").select("verified_at, submitted_at").eq("vendor_id", vendorId).maybeSingle();
+
+  // Verification needs all three review steps done. Save the progress (boxes and notes) without changing the badge.
+  if (markVerified && !(checks.license_checked && checks.coi_reviewed && checks.phone_call_done)) {
+    const { error } = await admin
+      .from("vendor_verifications")
+      .upsert({ vendor_id: vendorId, ...checks, admin_notes: adminNotes, verified_at: current?.verified_at ?? null }, { onConflict: "vendor_id" });
+    if (error) throw new Error(error.message);
+    finish(formData, `/admin/vendors/${vendorId}`, "verify-incomplete");
+  }
+
+  // Keep the original review date unless newer documents came in after it (a renewal) or it was never verified.
+  const needsNewDate = !current?.verified_at || (current.submitted_at && current.submitted_at > current.verified_at);
+  const verifiedAt = markVerified ? (needsNewDate ? new Date().toISOString() : current!.verified_at) : null;
+
+  const { error } = await admin
+    .from("vendor_verifications")
+    .upsert({ vendor_id: vendorId, ...checks, admin_notes: adminNotes, verified_at: verifiedAt }, { onConflict: "vendor_id" });
+  if (error) throw new Error(error.message);
+
+  const badgeChanged = (current?.verified_at ?? null) !== verifiedAt;
+  if (badgeChanged) refreshVendors();
+  if (markVerified && badgeChanged && vendor.status === "approved") await sendVendorVerified(vendor.profiles.email, vendor, verifiedAt!);
+
+  finish(formData, `/admin/vendors/${vendorId}#verification`, markVerified ? (badgeChanged ? "verified" : "verification-saved") : current?.verified_at ? "unverified" : "verification-saved");
 }

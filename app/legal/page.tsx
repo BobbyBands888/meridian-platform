@@ -25,7 +25,7 @@ const terms = [
   },
   {
     title: "Accuracy.",
-    body: "Listings and vendor profiles are submitted by users. We review submissions before publishing but do not verify the accuracy of any listing, price, description, credential, or claim. Verify everything independently.",
+    body: "Listings and vendor profiles are submitted by users. We review submissions before publishing but do not verify the accuracy of any listing, price, description, credential, or claim. Verify everything independently. A vendor verification badge means we reviewed that vendor's license and insurance documents on the date shown; it is not a guarantee of quality or of current licensing or insurance standing.",
   },
   {
     title: "Conduct.",
