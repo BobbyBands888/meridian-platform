@@ -62,7 +62,8 @@ export default async function VendorProfilePage({ params }: PageProps<"/vendors/
                 src={vendor.headshot_url}
                 alt={`${vendor.business_name} headshot`}
                 fill
-                priority
+                loading="eager"
+                fetchPriority="high"
                 sizes="(min-width: 640px) 192px, 100vw"
                 className="object-cover object-top"
               />

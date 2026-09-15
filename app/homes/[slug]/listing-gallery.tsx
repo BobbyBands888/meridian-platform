@@ -8,7 +8,11 @@ type Photo = { id: string; url: string };
 /** Swipeable photo strip on phones; large cover plus thumbnails on desktop. */
 export function ListingGallery({ photos, alt }: { photos: Photo[]; alt: string }) {
   const [index, setIndex] = useState(0);
+  // Only the cover and the next photo load up front; the rest load as the visitor moves through the gallery,
+  // so off-screen slides don't compete with the cover image for bandwidth.
+  const [loadedThrough, setLoadedThrough] = useState(1);
   const strip = useRef<HTMLDivElement>(null);
+  const reveal = (i: number) => setLoadedThrough((n) => Math.max(n, Math.min(photos.length - 1, i + 1)));
 
   if (photos.length === 0) {
     return <div className="aspect-[4/3] w-full rounded-2xl bg-surface sm:aspect-[16/9]" />;
@@ -17,6 +21,7 @@ export function ListingGallery({ photos, alt }: { photos: Photo[]; alt: string }
   function go(to: number) {
     const next = (to + photos.length) % photos.length;
     setIndex(next);
+    reveal(next);
     const el = strip.current;
     if (el) el.scrollTo({ left: next * el.clientWidth, behavior: "smooth" });
   }
@@ -29,7 +34,10 @@ export function ListingGallery({ photos, alt }: { photos: Photo[]; alt: string }
           onScroll={(e) => {
             const el = e.currentTarget;
             const i = Math.round(el.scrollLeft / el.clientWidth);
-            if (i !== index) setIndex(i);
+            if (i !== index) {
+              setIndex(i);
+              reveal(i);
+            }
           }}
           className="flex snap-x snap-mandatory overflow-x-auto [scrollbar-width:none] sm:rounded-2xl [&::-webkit-scrollbar]:hidden"
         >
@@ -40,15 +48,17 @@ export function ListingGallery({ photos, alt }: { photos: Photo[]; alt: string }
               aria-roledescription="slide"
               aria-label={`${i + 1} of ${photos.length}`}
             >
-              <Image
-                src={photo.url}
-                alt={i === 0 ? alt : `${alt}, ${i + 1} of ${photos.length}`}
-                fill
-                priority={i === 0}
-                loading={i === 0 ? undefined : "lazy"}
-                sizes="(min-width: 1152px) 1120px, 100vw"
-                className="object-cover"
-              />
+              {i <= loadedThrough && (
+                <Image
+                  src={photo.url}
+                  alt={i === 0 ? alt : `${alt}, ${i + 1} of ${photos.length}`}
+                  fill
+                  loading={i === 0 ? "eager" : "lazy"}
+                  fetchPriority={i === 0 ? "high" : "low"}
+                  sizes="(min-width: 1152px) 1120px, 100vw"
+                  className="object-cover"
+                />
+              )}
             </div>
           ))}
         </div>

@@ -14,6 +14,7 @@ type PhotoCardProps = {
   meta?: ReactNode;
   checks?: string[];
   action?: ReactNode;
+  /** Above-the-fold cards: load immediately at high priority (Next 16 replaced `priority` with these). */
   priority?: boolean;
 };
 
@@ -40,7 +41,8 @@ export function PhotoCard({
               src={imageUrl}
               alt={imageAlt}
               fill
-              priority={priority}
+              loading={priority ? "eager" : "lazy"}
+              fetchPriority={priority ? "high" : "auto"}
               sizes="(min-width: 1024px) 360px, (min-width: 640px) 50vw, 100vw"
               className={`object-cover transition-transform duration-500 group-hover:scale-[1.02] ${imagePosition === "top" ? "object-top" : ""}`}
             />
