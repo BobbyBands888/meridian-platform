@@ -12,7 +12,9 @@ export async function proxy(request: NextRequest) {
   // loses the original Host header but keeps x-forwarded-host (Vercel sets it on every request too).
   const target = await resolveHost(request.headers.get("x-forwarded-host") ?? request.headers.get("host"));
   const { pathname } = request.nextUrl;
-  const rest = pathname === "/" ? "" : pathname;
+  // A route folder named sitemap.xml under a dynamic segment is treated as a metadata file and doesn't match in
+  // production, so the sitemap lives at an internal sitemap-xml route.
+  const rest = pathname === "/" ? "" : pathname === "/sitemap.xml" ? "/sitemap-xml" : pathname;
 
   const rewriteTo = request.nextUrl.clone();
   if (target.kind === "hub") {

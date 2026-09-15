@@ -15,7 +15,7 @@ export async function generateStaticParams() {
 }
 
 // Public at /sitemap.xml on each market's own domain.
-export async function GET(_request: Request, { params }: RouteContext<"/[market]/sitemap.xml">) {
+export async function GET(_request: Request, { params }: RouteContext<"/[market]/sitemap-xml">) {
   const market = await getMarket((await params).market);
   if (!market) return new Response("Not found", { status: 404 });
   const url = (path: string) => marketUrl(market, path);
