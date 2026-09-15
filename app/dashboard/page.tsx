@@ -79,6 +79,17 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
               </ButtonLink>
             </div>
             <div className="rounded-xl bg-surface p-5">
+              <h3 className="font-semibold">{profile.roles.includes("vendor") ? "Your vendor profile" : "Offer professional services?"}</h3>
+              <p className="mt-1 text-[15px] leading-relaxed text-muted">
+                {profile.roles.includes("vendor")
+                  ? "Check your status and edit your directory profile."
+                  : "Join the vendor directory. Free for founding vendors."}
+              </p>
+              <ButtonLink href={profile.roles.includes("vendor") ? "/dashboard/vendor" : "/vendors/join"} variant="secondary" className="mt-4">
+                {profile.roles.includes("vendor") ? "Vendor dashboard" : "Join as a vendor"}
+              </ButtonLink>
+            </div>
+            <div className="rounded-xl bg-surface p-5">
               <h3 className="font-semibold">Looking to buy?</h3>
               <p className="mt-1 text-[15px] leading-relaxed text-muted">Browse Nashville homes listed by their owners.</p>
               <ButtonLink href="/homes" variant="secondary" className="mt-4">

@@ -31,11 +31,14 @@ The Supabase variable names say "anon" and "service role", but they hold the new
 
 ## Supabase (Phase 2)
 
-### 1. Run the database migration
+### 1. Run the database migrations
 
-1. Open **Supabase → SQL Editor → New query**.
-2. Paste the full contents of `supabase/migrations/20260914000000_initial_schema.sql`.
-3. Click **Run**. Supabase may warn that the query contains destructive operations: it drops and recreates its own policies and triggers so the file can be re-run. Confirm to continue.
+Run each file in `supabase/migrations/` in filename order, once each (re-running is safe):
+
+1. `20260914000000_initial_schema.sql` (Phase 2)
+2. `20260915000000_vendor_directory.sql` (Phase 3: vendor signup, held edits)
+
+For each: open **Supabase → SQL Editor → New query**, paste the full file, and click **Run**. Supabase may warn that the query contains destructive operations: it drops and recreates its own policies and triggers so the file can be re-run. Confirm to continue.
 
 The migration creates the tables, row-level security policies, the `listing-photos` and `vendor-headshots` storage buckets, and public read-only views. It is safe to run again after changes.
 
@@ -84,6 +87,8 @@ Supabase's default links only work in the same browser that requested them, whic
 - Subject: `Confirm your email for Nashville Buys`
 - Body: the same as above, with the heading changed to `Welcome to Nashville Buys`.
 
+The link opens a "Continue signing in" page on the site. The one-time token is only used when the person taps the button, so email security scanners that pre-open links (Outlook, Microsoft Defender, some corporate filters) can't use it up first.
+
 The link relies on the redirect URL the site sends, which always includes `?next=…`. If a sign-in link ever lands on the home page instead of `/auth/confirm`, the host it came from is missing from the Redirect URLs list above.
 
 ### 5. Send auth emails through Resend (required before launch)
@@ -131,6 +136,18 @@ The `_dmarc` record is optional but improves inbox placement. Don't add a second
 To receive replies at `hello@nashvillebuys.com`, you also need an inbox for it (for example Google Workspace, Fastmail, or Cloudflare Email Routing). That provider's MX records go on the root `@` name and don't conflict with Resend's `send` records.
 
 ---
+
+## Cloudflare Turnstile (Phase 3)
+
+Protects the contact forms on vendor profiles and listings.
+
+1. **Cloudflare dashboard → Turnstile → Add widget**
+   - Widget name: `Nashville Buys`
+   - Hostnames: `nashvillebuys.com`, `www.nashvillebuys.com` (add your Vercel preview domain too if you test forms on previews)
+   - Widget mode: **Invisible**
+2. Copy the **Site Key** to `NEXT_PUBLIC_TURNSTILE_SITE_KEY` and the **Secret Key** to `TURNSTILE_SECRET_KEY`.
+
+For local development, use Cloudflare's test keys so forms work on localhost: site key `1x00000000000000000000AA` and secret `1x0000000000000000000000000000000AA` (always passes). The secret `2x0000000000000000000000000000000AA` always fails, which is useful for checking that blocked submissions are rejected.
 
 ## Vercel
 

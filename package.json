@@ -12,9 +12,11 @@
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.116.0",
     "@vercel/analytics": "^2.0.1",
+    "heic-to": "^1.5.2",
     "next": "16.3.5",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "resend": "^6.28.0",
     "server-only": "^0.0.1"
   },
   "devDependencies": {

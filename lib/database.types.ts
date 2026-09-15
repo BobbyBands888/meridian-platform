@@ -53,6 +53,14 @@ type ListingRow = {
   updated_at: string;
 };
 
+type VendorPendingEditRow = {
+  vendor_id: string;
+  business_name: string;
+  bio: string;
+  headshot_url: string;
+  submitted_at: string;
+};
+
 type ListingPhotoRow = { id: string; listing_id: string; url: string; sort_order: number };
 
 type LeadRow = {
@@ -128,6 +136,14 @@ export type Database = {
           { foreignKeyName: "vendor_certifications_vendor_id_fkey"; columns: ["vendor_id"]; isOneToOne: true; referencedRelation: "vendors"; referencedColumns: ["id"] },
         ];
       };
+      vendor_pending_edits: {
+        Row: VendorPendingEditRow;
+        Insert: Omit<VendorPendingEditRow, "submitted_at"> & Partial<Pick<VendorPendingEditRow, "submitted_at">>;
+        Update: Partial<VendorPendingEditRow>;
+        Relationships: [
+          { foreignKeyName: "vendor_pending_edits_vendor_id_fkey"; columns: ["vendor_id"]; isOneToOne: true; referencedRelation: "vendors"; referencedColumns: ["id"] },
+        ];
+      };
     };
     Views: {
       public_vendors: {
@@ -145,6 +161,28 @@ export type Database = {
     };
     Functions: {
       is_admin: { Args: Record<PropertyKey, never>; Returns: boolean };
+      submit_vendor_application: {
+        Args: {
+          p_category: VendorCategoryValue;
+          p_business_name: string;
+          p_headshot_url: string;
+          p_bio: string;
+          p_service_area: string;
+          p_price_range: string;
+          p_website: string;
+          p_licensed: boolean;
+          p_insured: boolean;
+          p_understands_connector: boolean;
+          p_handles_own_agreements: boolean;
+          p_read_terms: boolean;
+        };
+        Returns: string;
+      };
+      queue_vendor_edit: {
+        Args: { p_vendor_id: string; p_business_name: string; p_bio: string; p_headshot_url: string };
+        Returns: undefined;
+      };
+      apply_vendor_edit: { Args: { p_vendor_id: string }; Returns: boolean };
     };
     Enums: {
       user_role: UserRole;
@@ -159,6 +197,8 @@ export type Database = {
 
 export type Profile = ProfileRow;
 export type Vendor = VendorRow;
+export type VendorPendingEdit = VendorPendingEditRow;
+export type PublicVendor = Database["public"]["Views"]["public_vendors"]["Row"];
 export type Listing = ListingRow;
 export type ListingPhoto = ListingPhotoRow;
 export type Lead = LeadRow;

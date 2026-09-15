@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Container, PageHeader } from "@/components/ui";
+import { ButtonLink, Container, PageHeader } from "@/components/ui";
 import { vendorCategories } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -33,6 +33,24 @@ export default function VendorsPage() {
             </li>
           ))}
         </ul>
+        <p className="mt-6">
+          <Link href="/vendors/all" className="text-[17px] font-semibold text-forest hover:underline">
+            All Vendors →
+          </Link>
+        </p>
+
+        <section aria-labelledby="join-heading" className="mt-16 rounded-3xl bg-surface px-6 py-10 sm:px-10">
+          <h2 id="join-heading" className="text-2xl font-bold tracking-tight sm:text-3xl">
+            Are you a Nashville pro?
+          </h2>
+          <p className="mt-3 max-w-xl text-[17px] leading-relaxed text-muted">
+            Free for founding vendors during our Nashville launch. When we introduce pricing, founding vendors get first notice
+            and a locked-in rate.
+          </p>
+          <ButtonLink href="/vendors/join" className="mt-6">
+            Join the directory
+          </ButtonLink>
+        </section>
       </Container>
     </>
   );

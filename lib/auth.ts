@@ -1,6 +1,6 @@
 import "server-only";
 import { cache } from "react";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import type { Profile } from "@/lib/database.types";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
@@ -40,5 +40,12 @@ export async function requireProfile(nextPath: string): Promise<Profile> {
   if (!user) redirect(`/sign-in?next=${encodeURIComponent(nextPath)}`);
   const profile = await getCurrentProfile();
   if (!profile || !isProfileComplete(profile)) redirect(`/welcome?next=${encodeURIComponent(nextPath)}`);
+  return profile;
+}
+
+/** Admin-only pages: anyone else gets a 404 so the page's existence isn't revealed. */
+export async function requireAdmin(nextPath: string): Promise<Profile> {
+  const profile = await requireProfile(nextPath);
+  if (!profile.is_admin) notFound();
   return profile;
 }
