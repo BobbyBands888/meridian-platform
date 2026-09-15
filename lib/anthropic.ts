@@ -40,8 +40,12 @@ Rules, in order of importance:
 
 Write three versions of the same description:
 - straightforward: plain and factual, 80 to 120 words.
-- warm: inviting and human, still only the given facts, 80 to 120 words.
-- short: the tightest of the three, around 80 words.`;
+- warm: inviting and human, same facts, 80 to 120 words.
+- short: the tightest of the three, 70 to 90 words.
+
+Hit those word counts by describing the details you were given more fully: how rooms connect, what a feature is
+like to use, what the seller pointed out. Never pad by adding a detail you weren't given. If there genuinely isn't
+enough material, come in short. Rule 1 beats the word count every time.`;
 
 function factsPrompt(facts: DescriptionFacts) {
   const lines = [
