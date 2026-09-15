@@ -10,6 +10,15 @@
 -- The three new tables are server-only: row-level security on, no policies, no grants to anon or authenticated.
 
 -- ---------------------------------------------------------------------------
+-- The 'interest' lead type
+-- ---------------------------------------------------------------------------
+
+-- First, and on its own: Postgres allows adding an enum value inside a transaction (since 12) as long as nothing
+-- uses it in the same transaction, and nothing below does. If your SQL editor still refuses it, run this one line
+-- by itself, then run the rest of the file.
+alter type public.lead_type add value if not exists 'interest';
+
+-- ---------------------------------------------------------------------------
 -- Signup market on profiles
 -- ---------------------------------------------------------------------------
 
@@ -34,10 +43,6 @@ revoke update (market_id) on public.profiles from authenticated;
 -- ---------------------------------------------------------------------------
 -- Expressions of interest
 -- ---------------------------------------------------------------------------
-
--- Postgres allows adding an enum value inside a transaction as long as nothing uses it in the same transaction,
--- which nothing below does.
-alter type public.lead_type add value if not exists 'interest';
 
 -- Offer amount, financing, pre-approval, and target closing date for an 'interest' lead; null for other types.
 alter table public.leads add column if not exists details jsonb;
