@@ -5,12 +5,10 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [{ source: "/sell/get-ready", destination: "/sell/checklist", permanent: true }];
   },
-  // Guides are read from content/ at request time (for revalidation), so ship those files with the server bundle.
+  // Guides and the checklist are read from content/ at request time (for revalidation), and many market pages look up
+  // the market's disclosure guide, so ship the content folder with every route.
   outputFileTracingIncludes: {
-    "/guides": ["./content/guides/**/*.md"],
-    "/guides/[slug]": ["./content/guides/**/*.md"],
-    "/sitemap.xml": ["./content/guides/**/*.md"],
-    "/sell/checklist": ["./content/checklist.md"],
+    "/**": ["./content/**/*.md"],
   },
   images: {
     // Listing photos and vendor headshots are served from Supabase Storage public buckets.

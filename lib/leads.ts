@@ -1,6 +1,7 @@
 import "server-only";
 import type { Lead } from "@/lib/database.types";
 import { fullAddress } from "@/lib/listings";
+import { getMarkets } from "@/lib/market-data";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -32,6 +33,7 @@ export type LeadWithTarget = Lead & { targetLabel: string; targetHref: string; r
 /** Admin only: leads with the vendor or listing they were sent to. Uses the secret key; call after an admin check. */
 export async function attachLeadTargets(leads: Lead[]): Promise<LeadWithTarget[]> {
   const admin = createAdminClient();
+  const markets = new Map((await getMarkets()).map((m) => [m.id, m]));
   const vendorIds = [...new Set(leads.filter((l) => l.type === "vendor").map((l) => l.target_id))];
   const listingIds = [...new Set(leads.filter((l) => l.type === "listing").map((l) => l.target_id))];
 
@@ -53,6 +55,7 @@ export async function attachLeadTargets(leads: Lead[]): Promise<LeadWithTarget[]
       return { ...lead, targetLabel: v?.business_name ?? "Deleted vendor", targetHref: `/admin/vendors/${lead.target_id}`, recipientEmail: v?.profiles.email ?? null };
     }
     const l = listingMap.get(lead.target_id);
-    return { ...lead, targetLabel: l ? fullAddress(l) : "Deleted listing", targetHref: `/admin/listings/${lead.target_id}`, recipientEmail: l?.profiles.email ?? null };
+    const market = markets.get(lead.market_id);
+    return { ...lead, targetLabel: l && market ? fullAddress(market, l) : "Deleted listing", targetHref: `/admin/listings/${lead.target_id}`, recipientEmail: l?.profiles.email ?? null };
   });
 }

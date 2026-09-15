@@ -14,12 +14,15 @@ export type GuideMeta = {
   publishedAt: string;
   updatedAt: string;
   vendorCategories: VendorCategoryValue[];
+  /** Optional role for linking from other pages. "disclosure" is the market's seller disclosure guide. */
+  topic: string | null;
   readingMinutes: number;
 };
 
 export type Guide = GuideMeta & { html: string };
 
-const GUIDES_DIR = path.join(process.cwd(), "content", "guides");
+// Each market has its own folder: content/guides/<market slug>/<guide slug>.md
+const GUIDES_ROOT = path.join(process.cwd(), "content", "guides");
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const CATEGORY_VALUES = new Set<string>(vendorCategories.map((c) => c.value));
 
@@ -56,11 +59,11 @@ const marked = new Marked({
   },
 });
 
-async function loadGuide(slug: string): Promise<Guide | null> {
-  if (!SLUG.test(slug)) return null;
+async function loadGuide(market: string, slug: string): Promise<Guide | null> {
+  if (!SLUG.test(market) || !SLUG.test(slug)) return null;
   let source: string;
   try {
-    source = await readFile(path.join(GUIDES_DIR, `${slug}.md`), "utf8");
+    source = await readFile(path.join(GUIDES_ROOT, market, `${slug}.md`), "utf8");
   } catch {
     return null;
   }
@@ -80,6 +83,7 @@ async function loadGuide(slug: string): Promise<Guide | null> {
     publishedAt: str("publishedAt"),
     updatedAt: str("updatedAt") || str("publishedAt"),
     vendorCategories: categories,
+    topic: str("topic") || null,
     readingMinutes: Math.max(1, Math.round(words / 230)),
     html: await marked.parse(body),
   };
@@ -87,9 +91,14 @@ async function loadGuide(slug: string): Promise<Guide | null> {
 
 export const getGuide = cache(loadGuide);
 
-export const getGuides = cache(async (): Promise<GuideMeta[]> => {
-  const files = (await readdir(GUIDES_DIR)).filter((f) => f.endsWith(".md"));
-  const guides = await Promise.all(files.map((f) => loadGuide(f.replace(/\.md$/, ""))));
+/** A market's guides, newest first. Markets without a guides folder have none. */
+export const getGuides = cache(async (market: string): Promise<GuideMeta[]> => {
+  if (!SLUG.test(market)) return [];
+  const files = await readdir(path.join(GUIDES_ROOT, market)).then(
+    (names) => names.filter((f) => f.endsWith(".md")),
+    () => [] as string[],
+  );
+  const guides = await Promise.all(files.map((f) => loadGuide(market, f.replace(/\.md$/, ""))));
   return guides
     .filter((g): g is Guide => g !== null)
     .map((g): GuideMeta => ({
@@ -100,6 +109,7 @@ export const getGuides = cache(async (): Promise<GuideMeta[]> => {
       publishedAt: g.publishedAt,
       updatedAt: g.updatedAt,
       vendorCategories: g.vendorCategories,
+      topic: g.topic,
       readingMinutes: g.readingMinutes,
     }))
     .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt) || a.title.localeCompare(b.title));
@@ -107,3 +117,9 @@ export const getGuides = cache(async (): Promise<GuideMeta[]> => {
 
 const dateFmt = new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
 export const formatGuideDate = (iso: string) => dateFmt.format(new Date(`${iso}T12:00:00Z`));
+
+/** Path to the market's seller disclosure guide (front matter `topic: disclosure`), if it has one. */
+export async function getDisclosureGuidePath(market: string) {
+  const guide = (await getGuides(market)).find((g) => g.topic === "disclosure");
+  return guide ? `/guides/${guide.slug}` : null;
+}

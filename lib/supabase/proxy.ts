@@ -8,12 +8,26 @@ function isProtected(pathname: string) {
   return PROTECTED_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 
+type Options = {
+  /** Internal URL to render (the market's route segment). */
+  rewriteTo: URL;
+  /** Request headers to add for the rendered route, like x-market. */
+  extraHeaders: Record<string, string>;
+};
+
 /**
- * Refreshes the Supabase auth session on each request and writes updated cookies to the response.
- * Also sends signed-out visitors on account pages to sign-in. Pages still check auth themselves.
+ * Refreshes the Supabase auth session on each request and writes updated cookies to the response, then renders the
+ * market route the proxy chose. Also sends signed-out visitors on account pages to sign-in. Pages still check auth.
  */
-export async function updateSession(request: NextRequest) {
-  let response = NextResponse.next({ request });
+export async function updateSession(request: NextRequest, { rewriteTo, extraHeaders }: Options) {
+  // Built from the current request headers each time, so refreshed session cookies reach the rendered route too.
+  const render = () => {
+    const headers = new Headers(request.headers);
+    for (const [key, value] of Object.entries(extraHeaders)) headers.set(key, value);
+    return NextResponse.rewrite(rewriteTo, { request: { headers } });
+  };
+
+  let response = render();
   const { pathname, search } = request.nextUrl;
 
   const env = getSupabaseEnv();
@@ -27,7 +41,7 @@ export async function updateSession(request: NextRequest) {
         },
         setAll(cookiesToSet, headers) {
           for (const { name, value } of cookiesToSet) request.cookies.set(name, value);
-          response = NextResponse.next({ request });
+          response = render();
           for (const { name, value, options } of cookiesToSet) response.cookies.set(name, value, options);
           for (const [key, value] of Object.entries(headers ?? {})) response.headers.set(key, value);
         },

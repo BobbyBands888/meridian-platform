@@ -1,6 +1,8 @@
 // Types for the schema in supabase/migrations. Keep in sync when the migration changes.
 // (Generated-style shape so it can be swapped for `supabase gen types typescript` output later.)
 
+import type { Market } from "@/lib/markets";
+
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export type UserRole = "buyer" | "seller" | "vendor";
@@ -40,6 +42,7 @@ type VendorRow = {
   website: string | null;
   status: VendorStatus;
   founding_vendor: boolean;
+  market_id: string;
   created_at: string;
 };
 
@@ -57,6 +60,7 @@ type ListingRow = {
   description: string;
   status: ListingStatus;
   slug: string;
+  market_id: string;
   created_at: string;
   updated_at: string;
 };
@@ -96,6 +100,7 @@ type LeadRow = {
   message: string;
   consent: boolean;
   source: string | null;
+  market_id: string;
   created_at: string;
 };
 
@@ -104,9 +109,14 @@ type ListingAlertRow = {
   email: string;
   zip: string | null;
   unsubscribe_token: string;
+  market_id: string;
   created_at: string;
   unsubscribed_at: string | null;
 };
+
+type MarketRow = Market & { created_at: string; updated_at: string };
+
+type SignInLinkRequestRow = { id: number; email: string; created_at: string };
 
 type VendorCertificationRow = {
   vendor_id: string;
@@ -121,6 +131,18 @@ type VendorCertificationRow = {
 export type Database = {
   public: {
     Tables: {
+      markets: {
+        Row: MarketRow;
+        Insert: Omit<MarketRow, "id" | "created_at" | "updated_at"> & Partial<Pick<MarketRow, "id">>;
+        Update: Partial<MarketRow>;
+        Relationships: [];
+      };
+      sign_in_link_requests: {
+        Row: SignInLinkRequestRow;
+        Insert: Pick<SignInLinkRequestRow, "email">;
+        Update: Partial<SignInLinkRequestRow>;
+        Relationships: [];
+      };
       profiles: {
         Row: ProfileRow;
         Insert: Partial<ProfileRow> & Pick<ProfileRow, "id" | "email">;
@@ -129,20 +151,22 @@ export type Database = {
       };
       vendors: {
         Row: VendorRow;
-        Insert: Omit<VendorRow, "id" | "status" | "founding_vendor" | "created_at" | "website"> &
-          Partial<Pick<VendorRow, "id" | "status" | "founding_vendor" | "created_at" | "website">>;
+        Insert: Omit<VendorRow, "id" | "status" | "founding_vendor" | "created_at" | "website" | "market_id"> &
+          Partial<Pick<VendorRow, "id" | "status" | "founding_vendor" | "created_at" | "website" | "market_id">>;
         Update: Partial<VendorRow>;
         Relationships: [
           { foreignKeyName: "vendors_profile_id_fkey"; columns: ["profile_id"]; isOneToOne: true; referencedRelation: "profiles"; referencedColumns: ["id"] },
+          { foreignKeyName: "vendors_market_id_fkey"; columns: ["market_id"]; isOneToOne: false; referencedRelation: "markets"; referencedColumns: ["id"] },
         ];
       };
       listings: {
         Row: ListingRow;
-        Insert: Omit<ListingRow, "id" | "city" | "hide_exact_address" | "sqft" | "status" | "slug" | "created_at" | "updated_at"> &
-          Partial<Pick<ListingRow, "id" | "city" | "hide_exact_address" | "sqft" | "status" | "slug" | "created_at" | "updated_at">>;
+        Insert: Omit<ListingRow, "id" | "city" | "hide_exact_address" | "sqft" | "status" | "slug" | "created_at" | "updated_at" | "market_id"> &
+          Partial<Pick<ListingRow, "id" | "city" | "hide_exact_address" | "sqft" | "status" | "slug" | "created_at" | "updated_at" | "market_id">>;
         Update: Partial<ListingRow>;
         Relationships: [
           { foreignKeyName: "listings_seller_id_fkey"; columns: ["seller_id"]; isOneToOne: false; referencedRelation: "profiles"; referencedColumns: ["id"] },
+          { foreignKeyName: "listings_market_id_fkey"; columns: ["market_id"]; isOneToOne: false; referencedRelation: "markets"; referencedColumns: ["id"] },
         ];
       };
       listing_photos: {
@@ -162,7 +186,7 @@ export type Database = {
       };
       listing_alerts: {
         Row: ListingAlertRow;
-        Insert: Pick<ListingAlertRow, "email"> & Partial<ListingAlertRow>;
+        Insert: Pick<ListingAlertRow, "email" | "market_id"> & Partial<ListingAlertRow>;
         Update: Partial<ListingAlertRow>;
         Relationships: [];
       };
@@ -209,6 +233,7 @@ export type Database = {
       is_admin: { Args: Record<PropertyKey, never>; Returns: boolean };
       submit_vendor_application: {
         Args: {
+          p_market: string;
           p_category: VendorCategoryValue;
           p_business_name: string;
           p_headshot_url: string;
@@ -231,6 +256,7 @@ export type Database = {
       apply_vendor_edit: { Args: { p_vendor_id: string }; Returns: boolean };
       submit_listing: {
         Args: {
+          p_market: string;
           p_street: string;
           p_city: string;
           p_zip: string;

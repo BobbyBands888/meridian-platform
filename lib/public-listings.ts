@@ -26,9 +26,9 @@ async function attachCovers(listings: PublicListing[]): Promise<ListingWithCover
   return listings.map((l) => ({ ...l, cover_url: covers.get(l.id) ?? null }));
 }
 
-/** Active listings, newest first, with optional filters. */
-export async function getActiveListings(filters: ListingFilters = {}, limit = 60): Promise<ListingWithCover[]> {
-  let query = client().from("public_listings").select("*").eq("status", "active").order("created_at", { ascending: false }).limit(limit);
+/** Active listings in this market, newest first, with optional filters. */
+export async function getActiveListings(marketId: string, filters: ListingFilters = {}, limit = 60): Promise<ListingWithCover[]> {
+  let query = client().from("public_listings").select("*").eq("market_id", marketId).eq("status", "active").order("created_at", { ascending: false }).limit(limit);
   if (filters.minPrice) query = query.gte("price", filters.minPrice);
   if (filters.maxPrice) query = query.lte("price", filters.maxPrice);
   if (filters.beds) query = query.gte("beds", filters.beds);
@@ -39,10 +39,10 @@ export async function getActiveListings(filters: ListingFilters = {}, limit = 60
   return attachCovers(data);
 }
 
-/** A published listing (active, under contract, or sold) and its photos in order. */
-export const getPublicListing = cache(async (slug: string) => {
+/** A published listing in this market (active, under contract, or sold) and its photos in order. */
+export const getPublicListing = cache(async (marketId: string, slug: string) => {
   if (!/^[a-z0-9-]{3,200}$/.test(slug)) return null;
-  const { data: listing, error } = await client().from("public_listings").select("*").eq("slug", slug).maybeSingle();
+  const { data: listing, error } = await client().from("public_listings").select("*").eq("market_id", marketId).eq("slug", slug).maybeSingle();
   if (error) throw new Error(`Could not load listing: ${error.message}`);
   if (!listing) return null;
   const { data: photos, error: photoError } = await client()
@@ -54,9 +54,9 @@ export const getPublicListing = cache(async (slug: string) => {
   return { listing, photos };
 });
 
-/** Slugs of listings that belong in the sitemap. */
-export async function getSitemapListings() {
-  const { data, error } = await client().from("public_listings").select("slug, updated_at").in("status", ["active", "under_contract"]);
+/** Slugs of this market's listings that belong in the sitemap. */
+export async function getSitemapListings(marketId: string) {
+  const { data, error } = await client().from("public_listings").select("slug, updated_at").eq("market_id", marketId).in("status", ["active", "under_contract"]);
   if (error) throw new Error(`Could not load listings: ${error.message}`);
   return data;
 }

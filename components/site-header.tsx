@@ -3,15 +3,20 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useSyncExternalStore } from "react";
-import { navLinks, site } from "@/lib/site";
+import { MarketSwitcher } from "@/components/market-switcher";
+import { brandName, type MarketLink } from "@/lib/markets";
+import { navLinksFor } from "@/lib/site";
 
 // @supabase/ssr stores the session in readable sb-<ref>-auth-token cookies. Checking for one avoids shipping
 // the Supabase client on every public page; account pages verify the session on the server.
 const hasSessionCookie = () => /(?:^|;\s*)sb-[^=]+-auth-token(?:\.0)?=/.test(document.cookie);
 const noopSubscribe = () => () => {};
 
-export function SiteHeader() {
+type Props = { market: MarketLink; liveMarkets: MarketLink[]; hubUrl: string };
+
+export function SiteHeader({ market, liveMarkets, hubUrl }: Props) {
   const pathname = usePathname();
+  const navLinks = navLinksFor(market);
   // Re-read on every render; route changes re-render the header, which picks up sign-in and sign-out.
   const signedIn = useSyncExternalStore(noopSubscribe, hasSessionCookie, () => false);
   const account = signedIn ? { href: "/dashboard", label: "Account" } : { href: "/sign-in", label: "Sign in" };
@@ -23,14 +28,16 @@ export function SiteHeader() {
 
   return (
     <header className="sticky top-0 z-50 border-b border-line bg-white/95 backdrop-blur">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
-        <Link href="/" className="flex items-center gap-2">
-          <span className="whitespace-nowrap text-xl font-bold tracking-tight text-forest">{site.name}</span>
-          {/* The location tag drops out on the narrowest phones so the name stays on one line. */}
-          <span className="whitespace-nowrap rounded border max-[359px]:hidden border-line px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wider text-muted">
-            Middle Tennessee
-          </span>
-        </Link>
+      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
+        <div className="flex min-w-0 items-center gap-2">
+          <Link href="/" className="whitespace-nowrap text-xl font-bold tracking-tight text-forest">
+            {brandName(market)}
+          </Link>
+          {/* The region tag doubles as the market switcher. It drops out on the narrowest phones so the name stays on one line. */}
+          <div className="max-[359px]:hidden">
+            <MarketSwitcher current={market} liveMarkets={liveMarkets} hubUrl={hubUrl} />
+          </div>
+        </div>
 
         <nav aria-label="Main" className="hidden items-center gap-8 md:flex">
           {navLinks.map((link) => (
@@ -38,9 +45,7 @@ export function SiteHeader() {
               key={link.href}
               href={link.href}
               aria-current={isActive(link.href) ? "page" : undefined}
-              className={`text-[15px] font-medium transition-colors hover:text-forest ${
-                isActive(link.href) ? "text-forest" : "text-ink"
-              }`}
+              className={`text-[15px] font-medium transition-colors hover:text-forest ${isActive(link.href) ? "text-forest" : "text-ink"}`}
             >
               {link.label}
             </Link>
@@ -55,7 +60,7 @@ export function SiteHeader() {
 
         <button
           type="button"
-          className="-mr-2 inline-flex h-11 w-11 items-center justify-center rounded-lg md:hidden"
+          className="-mr-2 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg md:hidden"
           aria-expanded={open}
           aria-controls="mobile-menu"
           aria-label={open ? "Close menu" : "Open menu"}

@@ -1,7 +1,7 @@
 "use client";
 
 import { startTransition, useActionState, useCallback, useEffect, useId, useRef, useState } from "react";
-import { subscribeToListingAlerts, type AlertSignupState } from "@/app/actions/listing-alerts";
+import { subscribeToListingAlerts, type AlertSignupState } from "@/app/_actions/listing-alerts";
 import { Check } from "@/components/photo-card";
 import { Turnstile, type TurnstileHandle } from "@/components/turnstile";
 import { Button } from "@/components/ui";

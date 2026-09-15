@@ -450,7 +450,10 @@ select
 from public.vendors v
 where v.status = 'approved';
 
-create or replace view public.public_listings
+-- Dropped and recreated for the same reason as public_vendors (a later migration adds market_id).
+drop view if exists public.public_listing_photos;
+drop view if exists public.public_listings;
+create view public.public_listings
 with (security_barrier = true)
 as
 select
@@ -471,7 +474,7 @@ select
 from public.listings l
 where l.status in ('active', 'under_contract', 'sold');
 
-create or replace view public.public_listing_photos
+create view public.public_listing_photos
 with (security_barrier = true)
 as
 select p.id, p.listing_id, p.url, p.sort_order

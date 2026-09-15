@@ -3,7 +3,7 @@ import type { Database } from "@/lib/database.types";
 import { requireSupabaseEnv } from "./env";
 
 /** Cache tags for public data. Server actions that change it call updateTag() with the same tag. */
-export const CACHE_TAGS = { vendors: "vendors", listings: "listings" } as const;
+export const CACHE_TAGS = { vendors: "vendors", listings: "listings", markets: "markets" } as const;
 
 type Options = { tags: string[]; revalidate?: number };
 

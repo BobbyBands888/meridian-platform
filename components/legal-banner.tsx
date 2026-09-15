@@ -1,10 +1,8 @@
 "use client";
 
-import { site } from "@/lib/site";
-
 const STORAGE_KEY = "nb-legal-dismissed";
 
-export function LegalBanner() {
+export function LegalBanner({ brand, text }: { brand: string; text: string }) {
   function dismiss() {
     try {
       sessionStorage.setItem(STORAGE_KEY, "1");
@@ -15,9 +13,9 @@ export function LegalBanner() {
   }
 
   return (
-    <div id="legal-banner" role="note" aria-label="About Nashville Buys" className="border-b border-line bg-surface">
+    <div id="legal-banner" role="note" aria-label={`About ${brand}`} className="border-b border-line bg-surface">
       <div className="mx-auto flex max-w-6xl items-start gap-3 px-4 py-2.5 sm:px-6">
-        <p className="flex-1 text-[13px] leading-relaxed text-muted">{site.disclaimer}</p>
+        <p className="flex-1 text-[13px] leading-relaxed text-muted">{text}</p>
         <button
           type="button"
           onClick={dismiss}

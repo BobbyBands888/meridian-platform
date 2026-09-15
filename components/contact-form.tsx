@@ -4,11 +4,11 @@ import { useActionState, useCallback, useEffect, useRef, useState } from "react"
 import { Check } from "@/components/photo-card";
 import { Turnstile, type TurnstileHandle } from "@/components/turnstile";
 import { Button } from "@/components/ui";
-import { sendInquiry, type InquiryState } from "@/app/actions/inquiry";
+import { sendInquiry, type InquiryState } from "@/app/_actions/inquiry";
 
-type Props = { type: "vendor" | "listing"; targetId: string; recipientLabel: string };
+type Props = { type: "vendor" | "listing"; targetId: string; recipientLabel: string; brand: string };
 
-export function ContactForm({ type, targetId, recipientLabel }: Props) {
+export function ContactForm({ type, targetId, recipientLabel, brand }: Props) {
   const [state, formAction, pending] = useActionState<InquiryState, FormData>(sendInquiry, {});
   const [token, setToken] = useState("");
   const turnstile = useRef<TurnstileHandle>(null);
@@ -70,7 +70,7 @@ export function ContactForm({ type, targetId, recipientLabel }: Props) {
           Send message to {recipientLabel}
         </Button>
         <p className="text-[13px] leading-relaxed text-muted">
-          Your message and contact details go to {recipientLabel}, with a copy to the Nashville Buys team. We never show contact information publicly.
+          Your message and contact details go to {recipientLabel}, with a copy to the {brand} team. We never show contact information publicly.
         </p>
         <p role="status" aria-live="polite" className="text-[15px] text-red-700">
           {state.status === "error" ? state.message : null}

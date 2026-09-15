@@ -1,21 +1,21 @@
-export const site = {
-  name: "Nashville Buys",
-  company: "Ownvista",
-  url: "https://www.nashvillebuys.com",
-  email: "hello@nashvillebuys.com",
-  tagline: "Buy and sell direct. Nashville's FSBO hub.",
-  description:
-    "Nashville Buys is a free for-sale-by-owner listing hub for Nashville, TN, with a directory of vetted local vendors. Buyers and sellers connect directly.",
-  disclaimer:
-    "Nashville Buys connects buyers, sellers, and professionals directly. We are not a broker, do not hold funds, and do not facilitate closings. All parties should hire independent legal counsel.",
-} as const;
+import type { MarketStatus } from "@/lib/markets";
 
-export const navLinks = [
+// Brand, domain, and sender details are per market: see lib/markets.ts.
+
+const liveNavLinks = [
   { href: "/homes", label: "Buy" },
   { href: "/sell", label: "Sell" },
   { href: "/vendors", label: "Vendors" },
   { href: "/guides", label: "Guides" },
-] as const;
+];
+
+/** Coming-soon markets have no listings, directory, or guides yet, so the header only offers sign-in. */
+export function navLinksFor(market: { status: MarketStatus }) {
+  return market.status === "live" ? liveNavLinks : [];
+}
+
+/** Shown wherever the site invites vendors to join the directory. */
+export const VENDOR_CATEGORY_LIMIT_NOTE = "We keep each category to a handful of pros so the leads mean something.";
 
 export const vendorCategories = [
   { value: "attorney", slug: "attorneys", label: "Attorneys", singular: "Attorney" },

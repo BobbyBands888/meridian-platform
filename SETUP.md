@@ -1,13 +1,15 @@
-# Nashville Buys setup
+# Ownvista setup (Nashville Buys, Tampa Buys, Orlando Buys)
 
 Everything you need to configure outside the code: accounts, environment variables, Supabase, email DNS, and bot protection. Sections are marked with the phase that needs them.
+
+One codebase and one database serve every market. The request's hostname picks the market (`nashvillebuys.com` is Nashville, `tampabuys.com` is Tampa), and `getownvista.com` shows the hub page listing all markets. To add a city, see **Launch a new market** at the end.
 
 ## Accounts
 
 | Service | Used for | Sign up |
 | --- | --- | --- |
 | Supabase | Sign-in (magic link), Postgres database, photo storage | https://supabase.com/dashboard |
-| Resend | Sign-in emails and transactional email from hello@nashvillebuys.com | https://resend.com |
+| Resend | Sign-in emails and transactional email from each market's own address (hello@nashvillebuys.com, hello@tampabuys.com, ...) | https://resend.com |
 | Cloudflare Turnstile | Invisible bot protection on public forms | https://dash.cloudflare.com → Turnstile |
 | Vercel | Hosting, domain, analytics | https://vercel.com |
 
@@ -20,7 +22,7 @@ Set these in `.env.local` for local development, and in **Vercel → Project →
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase → Project Settings → Data API → Project URL | Yes |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase → Project Settings → API Keys → **Publishable key** (`sb_publishable_…`) | Yes |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Project Settings → API Keys → **Secret key** (`sb_secret_…`) | **No, server only** |
-| `RESEND_API_KEY` | Resend → API Keys → Create API key (Sending access, domain nashvillebuys.com) | **No, server only** |
+| `RESEND_API_KEY` | Resend → API Keys → Create API key (Sending access, **All domains**, so it can send for every market) | **No, server only** |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Cloudflare → Turnstile → your widget → Site Key | Yes |
 | `TURNSTILE_SECRET_KEY` | Cloudflare → Turnstile → your widget → Secret Key | **No, server only** |
 | `ADMIN_EMAIL` | The address that receives approval requests and lead copies | No |
@@ -41,6 +43,7 @@ Run each file in `supabase/migrations/` in filename order, once each (re-running
 4. `20260917000000_listing_city.sql` (Phase 4: listing city for Middle Tennessee ZIP codes)
 5. `20260918000000_vendor_verification.sql` (Verified vendor tier and the private `vendor-documents` bucket)
 6. `20260919000000_listing_alerts.sql` (Buyer listing alert signups; server-only table)
+7. `20260920000000_markets.sql` (Phase 7: markets table, `market_id` on vendors, listings, leads, and alerts, sign-in email rate limit)
 
 If you ever re-run an earlier file, re-run every later file after it too, since later files replace some of its functions.
 
@@ -71,6 +74,8 @@ The Security Advisor will list `public_vendors`, `public_listings`, and `public_
 
 ### 4. Email templates
 
+Since Phase 7 the site sends sign-in emails itself through Resend, so each market's sender address and brand are used. It creates the one-time link with the Supabase admin API and limits each address to one sign-in email a minute and five an hour. The templates below are only used if Supabase itself sends an auth email (for example an email-address change), so they're optional now.
+
 Supabase's default links only work in the same browser that requested them, which breaks when someone requests a link on their laptop and taps it on their phone, or opens it from the Gmail app. These templates send people to the site's `/auth/confirm` page, which works on any device.
 
 **Authentication → Emails → Templates**
@@ -97,9 +102,9 @@ The link opens a "Continue signing in" page on the site. The one-time token is o
 
 The link relies on the redirect URL the site sends, which always includes `?next=…`. If a sign-in link ever lands on the home page instead of `/auth/confirm`, the host it came from is missing from the Redirect URLs list above.
 
-### 5. Send auth emails through Resend (required before launch)
+### 5. Send auth emails through Resend
 
-Supabase's built-in email sender only delivers to members of your Supabase team and is limited to a few messages per hour. Real users won't receive sign-in links until custom SMTP is set up.
+Sign-in links no longer go through Supabase (see above), so this is only a fallback for other Supabase auth emails. Supabase's built-in email sender only delivers to members of your Supabase team and is limited to a few messages per hour. Real users won't receive sign-in links until custom SMTP is set up.
 
 1. Verify `nashvillebuys.com` in Resend first (see **Resend DNS records** below).
 2. **Supabase → Authentication → Emails → SMTP Settings → Enable custom SMTP**
@@ -159,7 +164,7 @@ For local development, use Cloudflare's test keys so forms work on localhost: si
 
 ## Guides
 
-Guides are markdown files in `content/guides/`. The filename is the URL slug (`content/guides/my-guide.md` becomes `/guides/my-guide`). Each file starts with front matter:
+Guides are markdown files in `content/guides/<market>/`, one folder per market (`content/guides/nashville/`). The filename is the URL slug (`content/guides/nashville/my-guide.md` becomes `nashvillebuys.com/guides/my-guide`). A live market with no folder simply has no guides: its Guides page shows an empty state (kept out of search results), and the home page's guides card and links are hidden until the first file is added. Each file starts with front matter:
 
 ```md
 ---
@@ -169,18 +174,74 @@ description: One or two sentences for search results and link previews.
 publishedAt: 2026-09-15
 updatedAt: 2026-10-01 (optional)
 vendorCategories: [attorney, home_inspector]
+topic: disclosure (optional; marks the market's seller disclosure guide)
 ---
 ```
+
+The guide with `topic: disclosure` is linked from the listing form, listing pages, the listing-received email, and the checklist's disclosure step.
+
+## Mailing address
+
+Every market's site footer, the hub footer, and marketing emails (listing alert confirmations, pre-launch vendor confirmations and approvals, and future alert digests) show `Ownvista, PO Box 44, Medford, MA 02155`. It's set once as `COMPANY.mailingAddress` in `lib/markets.ts`; send a new email with `marketing: true` to include it.
+
+## Checklist
+
+`content/checklist.md` is shared by every market. These placeholders are filled in from the market's row: `{brand}` (Nashville Buys), `{name}` (Nashville), `{region}` (Middle Tennessee), `{state}` (Tennessee), `{closing}` (the market's `closing_note`, like "attorney or title company"), and `{disclosure}` (its `disclosure_note`, one sentence on the state's seller disclosure rule).
 
 `vendorCategories` uses the category values (attorney, home_inspector, photographer, painter, stager, handyman, lender, home_insurance) to show matching vendor cards under the guide. Commit and push a new or edited file; it goes live with the next deploy and is added to the sitemap automatically.
 
 ## Admin
 
-- `/admin` has three tabs: **Pending Vendors** (new applications and edits to live profiles), **Pending Listings**, and **All Leads**. Approve and reject buttons send the matching email. Open a row's Review page to add a note to a rejection.
-- **Export vendors (CSV)**, **Export leads (CSV)**, and **Export listing alerts (CSV)** download everything, including contact details. Treat the files as private.
+- `/admin` works on any market's domain (sign in on that domain). It has four tabs: **Pending Vendors** (new applications and edits to live profiles), **Pending Listings**, **All Leads**, and **Markets**. Approve and reject buttons send the matching email, from the vendor's or listing's own market. Open a row's Review page to add a note to a rejection.
+- **Market filter:** every tab, count, and export follows the market filter above the tabs. It starts on the market whose domain you're on; choose **All markets** to see everything. Each row shows its market, and vendors who signed up in a coming-soon market are labeled **Pre-launch**.
+- **Markets tab:** shows each market's status, domain, sender, and counties. **Flip to live** (with the confirmation box checked) launches a market; **Set back to coming soon** hides its listings and directory again.
+- **Export vendors (CSV)**, **Export leads (CSV)**, and **Export listing alerts (CSV)** download the filtered market (or all markets), with a market column. They include contact details, so treat the files as private.
 - **Listing alert signups** (under the Admin heading) counts active buyer signups from the home page and /homes. Signups are only collected for now: each gets a confirmation email with an unsubscribe link, and no alert emails are sent yet.
 
 ## Vercel
 
-- **Domains:** `www.nashvillebuys.com` is primary, and `nashvillebuys.com` redirects to it (Project → Settings → Domains).
+- **Domains:** for each market, `www.<domain>` is primary and the bare domain redirects to it (Project → Settings → Domains). Add `getownvista.com` and `www.getownvista.com` the same way for the hub.
 - **Analytics:** Project → Analytics → Enable. The site already includes the Analytics component.
+
+## Local development: simulating markets
+
+`npm run dev`, then open:
+
+- `http://localhost:3000`: Nashville
+- `http://tampa.localhost:3000` or `http://orlando.localhost:3000`: that market (any `<slug>.localhost` works)
+- `http://hub.localhost:3000`: the Ownvista hub
+
+Sign-in works on each of these hosts, and the session is separate per host, just like on the real domains. You can also send a real domain in the Host header: `curl -H "Host: tampabuys.com" http://localhost:3000/`.
+
+## Launch a new market
+
+Example: Atlanta at atlantabuys.com. Do steps 1 through 6 while the market is coming soon; the launch page, buyer alerts, and vendor pre-registration work from step 4 on.
+
+1. **Vercel domain.** Project → Settings → Domains → add `atlantabuys.com` and `www.atlantabuys.com`. Make `www` the primary domain and set the bare domain to redirect to it.
+2. **DNS records** at the domain registrar:
+   - For Vercel: an `A` record on `@` pointing to the IP Vercel shows (currently `76.76.21.21`), and a `CNAME` on `www` pointing to `cname.vercel-dns.com`. Use the exact values Vercel displays.
+   - For Resend: Resend → Domains → Add Domain → `atlantabuys.com`, then add the `MX` and `TXT` (SPF) records on `send`, the DKIM `TXT` on `resend._domainkey`, and the `_dmarc` `TXT`, as listed under **Resend DNS records** above. Click **Verify DNS Records**. Until the domain verifies, that market's emails go out from `hello@nashvillebuys.com` with the new market's name and a reply-to of its own address, so nothing fails in the meantime.
+   - For receiving mail: the `MX` records for your inbox provider on `@` (next step).
+3. **Workspace email alias.** Google Workspace Admin → Account → Domains → Manage domains → **Add a domain** → `atlantabuys.com` as a **Secondary domain** and verify it (Workspace gives you a `TXT` record and its `MX` records). Then Directory → Users → your user → **Alternate email addresses** → add `hello@atlantabuys.com`. (A user alias domain won't work here: it only mirrors existing usernames.) Send a test email to that address to confirm it arrives.
+4. **Market row.** Supabase → SQL Editor, adjust the values, and run. Leave `status` as `coming_soon`:
+
+```sql
+insert into public.markets
+  (slug, name, short_name, region, state, state_code, status, domain, counties, sender_email, closing_note, disclosure_note, timezone, sort_order)
+values
+  ('atlanta', 'Atlanta', 'ATL', 'Metro Atlanta', 'Georgia', 'GA', 'coming_soon', 'atlantabuys.com',
+   array['Fulton', 'DeKalb', 'Cobb', 'Gwinnett'], 'hello@atlantabuys.com',
+   'attorney',
+   'One sentence on Georgia''s seller disclosure rules, written for sellers.',
+   'America/New_York', 4);
+```
+
+   - `name` is the city in "<name> Buys"; `region` is the header tag; `short_name` is the admin badge.
+   - `closing_note` reads after "your" in the checklist ("Line up your attorney now"). `disclosure_note` is one sentence and appears on the listing form, listing pages, and the checklist.
+   - The slug is permanent: it's the `content/guides/<slug>/` folder, the ZIP data key, and the local `<slug>.localhost` host.
+
+5. **ZIP data.** Create `lib/markets/zips/atlanta.ts` with the same structure as `tampa.ts` (every residential ZIP with its mailing city, a common area name, and its county, plus the county list in display order), and add it to `marketZips` in `lib/markets/zips/index.ts`. Commit and push. This drives the ZIP menus, search, alert ZIPs, and listing locations.
+6. **Guides (optional before launch).** Add markdown files to `content/guides/atlanta/` (see **Guides**). Mark the disclosure guide with `topic: disclosure`. Commit and push.
+7. **Supabase Auth URLs.** Authentication → URL Configuration → Redirect URLs → add `https://atlantabuys.com/**` and `https://www.atlantabuys.com/**`. (The site builds its own sign-in links, but keep these for any email Supabase sends.)
+8. **Turnstile.** Cloudflare → Turnstile → your widget → Hostname management → add `atlantabuys.com` and `www.atlantabuys.com`. Forms (sign-in, alerts, contact) on the new domain fail the bot check until this is done.
+9. **Flip to live.** Sign in to `/admin` on any market's domain → **Markets** → check the confirmation box next to the new market → **Flip to live**. Listings, the vendor directory (including pre-launch vendors you approved), guides, and the sitemap go public right away, and the market appears in the header's market switcher. Approved pre-launch vendors aren't emailed automatically, so let them know they're live.

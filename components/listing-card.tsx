@@ -1,9 +1,10 @@
 import { PhotoCard } from "@/components/photo-card";
+import type { AreaMarket } from "@/lib/areas";
 import { formatPrice, formatSpecs, listingLocation, listingPath } from "@/lib/listings";
 import type { ListingWithCover } from "@/lib/public-listings";
 
-export function ListingCard({ listing, priority }: { listing: ListingWithCover; priority?: boolean }) {
-  const location = listingLocation(listing);
+export function ListingCard({ market, listing, priority }: { market: AreaMarket; listing: ListingWithCover; priority?: boolean }) {
+  const location = listingLocation(market, listing);
   return (
     <PhotoCard
       href={listingPath(listing)}

@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { cache } from "react";
 import type { VendorCategoryValue } from "@/lib/database.types";
+import { brandName, type Market } from "@/lib/markets";
 import { vendorCategories } from "@/lib/site";
 
 export type ChecklistStep = {
@@ -84,4 +85,25 @@ export function parseChecklist(markdown: string): Checklist {
   return { title, disclaimer: disclaimer.join(" "), closingNote: closing.join(" "), sections };
 }
 
-export const getChecklist = cache(async () => parseChecklist(await readFile(CHECKLIST_FILE, "utf8")));
+/**
+ * content/checklist.md is shared by every market. Placeholders fill in what differs by state:
+ * {brand} "Nashville Buys", {name} "Nashville", {region} "Middle Tennessee", {state} "Tennessee",
+ * {closing} the market's closing note ("attorney or title company"), {disclosure} its disclosure note.
+ */
+export function fillMarketPlaceholders(text: string, market: Market) {
+  const values: Record<string, string> = {
+    brand: brandName(market),
+    name: market.name,
+    region: market.region,
+    state: market.state,
+    closing: market.closing_note,
+    disclosure: market.disclosure_note,
+  };
+  return text.replace(/\{(brand|name|region|state|closing|disclosure)\}/g, (_, key: string) => values[key]);
+}
+
+const readChecklistFile = cache(() => readFile(CHECKLIST_FILE, "utf8"));
+
+export async function getChecklist(market: Market) {
+  return parseChecklist(fillMarketPlaceholders(await readChecklistFile(), market));
+}

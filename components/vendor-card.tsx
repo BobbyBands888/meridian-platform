@@ -1,10 +1,11 @@
 import { PhotoCard } from "@/components/photo-card";
 import { ButtonLink } from "@/components/ui";
 import type { PublicVendor } from "@/lib/database.types";
+import type { Market } from "@/lib/markets";
 import { verifiedBadgeText } from "@/lib/verification";
 import { categoryByValue, firstSentence, vendorPath } from "@/lib/vendors";
 
-export function VendorCard({ vendor, priority }: { vendor: PublicVendor; priority?: boolean }) {
+export function VendorCard({ market, vendor, priority }: { market: Pick<Market, "name" | "timezone">; vendor: PublicVendor; priority?: boolean }) {
   const href = vendorPath(vendor);
   return (
     <PhotoCard
@@ -29,7 +30,7 @@ export function VendorCard({ vendor, priority }: { vendor: PublicVendor; priorit
         </dl>
       }
       checks={[
-        vendor.verified_at ? verifiedBadgeText(vendor.verified_at) : "Licensed and insured, self-certified",
+        vendor.verified_at ? verifiedBadgeText(market, vendor.verified_at) : "Licensed and insured, self-certified",
         ...(vendor.founding_vendor ? ["Founding vendor"] : []),
       ]}
       action={

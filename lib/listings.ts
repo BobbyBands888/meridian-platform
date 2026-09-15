@@ -1,11 +1,9 @@
 import type { ListingStatus } from "@/lib/database.types";
-import { areaForZip, locationLine } from "@/lib/areas";
+import { areaForZip, locationLine, type AreaMarket } from "@/lib/areas";
 
 export const LISTING_PHOTO_MAX = 20;
 export const DESCRIPTION_MIN = 50;
 export const DESCRIPTION_MAX = 5000;
-
-export const DISCLOSURE_GUIDE_PATH = "/guides/tennessee-property-disclosure-form";
 
 const priceFmt = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const numberFmt = new Intl.NumberFormat("en-US");
@@ -27,16 +25,16 @@ export function listingPath(listing: { slug: string }) {
 }
 
 /** Public-facing location: street when shown, otherwise area and ZIP only. */
-export function listingLocation(listing: { street: string | null; hide_exact_address: boolean; zip: string; city: string }) {
+export function listingLocation(market: AreaMarket, listing: { street: string | null; hide_exact_address: boolean; zip: string; city: string }) {
   return {
-    headline: !listing.hide_exact_address && listing.street ? listing.street : `Home in ${areaForZip(listing.zip)}`,
-    area: locationLine(listing.zip, listing.city),
+    headline: !listing.hide_exact_address && listing.street ? listing.street : `Home in ${areaForZip(market, listing.zip)}`,
+    area: locationLine(market, listing.zip, listing.city),
   };
 }
 
 /** Private location for the seller and admin: full street plus area. */
-export function fullAddress(listing: { street: string; zip: string; city: string }) {
-  return `${listing.street}, ${locationLine(listing.zip, listing.city)}`;
+export function fullAddress(market: AreaMarket, listing: { street: string; zip: string; city: string }) {
+  return `${listing.street}, ${locationLine(market, listing.zip, listing.city)}`;
 }
 
 export const statusLabels: Record<ListingStatus, string> = {
@@ -47,9 +45,9 @@ export const statusLabels: Record<ListingStatus, string> = {
   rejected: "Not approved",
 };
 
-/** "3 bedroom home in East Nashville, Nashville" style summary for titles and previews. */
-export function listingSummary(listing: { beds: number; zip: string; city: string; price: number }) {
-  const area = areaForZip(listing.zip);
+/** "3 bedroom home in East Nashville, Nashville, TN" style summary for titles and previews. */
+export function listingSummary(market: AreaMarket, listing: { beds: number; zip: string; city: string; price: number }) {
+  const area = areaForZip(market, listing.zip);
   const place = area === listing.city ? listing.city : `${area}, ${listing.city}`;
-  return `${Number(listing.beds)} bedroom home in ${place}, TN, for sale by owner at ${formatPrice(listing.price)}`;
+  return `${Number(listing.beds)} bedroom home in ${place}, ${market.state_code}, for sale by owner at ${formatPrice(listing.price)}`;
 }

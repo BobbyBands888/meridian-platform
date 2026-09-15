@@ -4,7 +4,7 @@ import { useActionState } from "react";
 import { Button } from "@/components/ui";
 import type { UserRole } from "@/lib/database.types";
 import { formatUsPhone } from "@/lib/phone";
-import type { ProfileFormState } from "@/app/welcome/actions";
+import type { ProfileFormState } from "@/app/[market]/welcome/actions";
 
 const roleOptions: { value: UserRole; label: string; hint: string }[] = [
   { value: "buyer", label: "Buying a home", hint: "Contact sellers about their listings" },
@@ -17,9 +17,10 @@ type Props = {
   next: string;
   initial: { full_name: string | null; phone: string | null; roles: UserRole[] };
   submitLabel: string;
+  brand: string;
 };
 
-export function ProfileForm({ action, next, initial, submitLabel }: Props) {
+export function ProfileForm({ action, next, initial, submitLabel, brand }: Props) {
   const [state, formAction, pending] = useActionState<ProfileFormState, FormData>(action, {});
   const values = state.values ?? { full_name: initial.full_name ?? "", phone: formatUsPhone(initial.phone), roles: initial.roles };
   const errors = state.errors ?? {};
@@ -66,7 +67,7 @@ export function ProfileForm({ action, next, initial, submitLabel }: Props) {
       </Field>
 
       <fieldset aria-describedby={errors.roles ? "roles-error" : undefined}>
-        <legend className="text-[15px] font-medium">What brings you to Nashville Buys?</legend>
+        <legend className="text-[15px] font-medium">What brings you to {brand}?</legend>
         <p className="mt-1 text-[13px] text-muted">Choose all that apply. You can change this later.</p>
         <div className="mt-3 space-y-2">
           {roleOptions.map((role) => (
