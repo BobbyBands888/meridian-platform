@@ -83,7 +83,7 @@ The most expensive FSBO mistake is a slow series of small price cuts. Decide now
 - **A pre-listing inspection** doesn't set the price, but it tells you what a buyer's inspector will find, so you can price the repairs in instead of negotiating them out later. [Find a Nashville home inspector](/vendors/home-inspectors).
 - **A closing attorney or title company** isn't involved in pricing, but you'll want one lined up before your first offer. [Read what they do and what it costs](/guides/closing-attorney-title-company-tennessee-fsbo).
 
-Pricing is step 8 on our [37-step FSBO checklist](/sell/checklist). The seven before it, especially the pre-listing inspection, make this step much easier.
+Finding your comps is step 2 on our [37-step FSBO checklist](/sell/checklist), and the pre-listing inspection is step 3. Doing both before you set a price makes this much easier.
 
 ## Frequently asked questions
 

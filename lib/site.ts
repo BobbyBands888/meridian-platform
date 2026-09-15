@@ -18,7 +18,8 @@ export function navLinksFor(market: { status: MarketStatus }) {
 export const VENDOR_CATEGORY_LIMIT_NOTE = "We keep each category to a handful of pros so the leads mean something.";
 
 export const vendorCategories = [
-  { value: "attorney", slug: "attorneys", label: "Attorneys", singular: "Attorney" },
+  // Title companies join this category too; the slug stays /vendors/attorneys.
+  { value: "attorney", slug: "attorneys", label: "Closing Attorneys & Title", singular: "Closing Attorney or Title Company" },
   { value: "home_inspector", slug: "home-inspectors", label: "Home Inspectors", singular: "Home Inspector" },
   { value: "photographer", slug: "photographers", label: "Photographers", singular: "Photographer" },
   { value: "painter", slug: "painters", label: "Painters", singular: "Painter" },

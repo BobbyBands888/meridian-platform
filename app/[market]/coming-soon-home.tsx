@@ -49,7 +49,7 @@ export function ComingSoonHome({ market }: { market: Market }) {
                 {market.name} pros: pre-register as a founding vendor
               </h2>
               <p className="mt-4 text-[17px] leading-relaxed text-muted">
-                Attorneys, inspectors, photographers, painters, stagers, handymen, lenders, and insurance agents serving{" "}
+                Closing attorneys, title companies, inspectors, photographers, painters, stagers, handymen, lenders, and insurance agents serving{" "}
                 {countyList(market)}. Create your profile now; we review it before launch and list you in the directory the day{" "}
                 {brand} opens. {VENDOR_CATEGORY_LIMIT_NOTE}
               </p>

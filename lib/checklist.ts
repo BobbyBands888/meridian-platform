@@ -20,8 +20,14 @@ export type Checklist = { title: string; disclaimer: string; closingNote: string
 
 const CHECKLIST_FILE = path.join(process.cwd(), "content", "checklist.md");
 
-// "(Home Inspectors)" or "(Painters, Handymen)" marks a step with vendor categories, using the directory's labels.
-const labelToCategory = new Map<string, VendorCategoryValue>(vendorCategories.map((c) => [c.label.toLowerCase(), c.value]));
+// "(Home Inspectors)" or "(Painters, Handymen)" marks a step with vendor categories, by the directory's label or its URL
+// slug ("(Attorneys)" still works now that the label is "Closing Attorneys & Title").
+const labelToCategory = new Map<string, VendorCategoryValue>(
+  vendorCategories.flatMap((c) => [
+    [c.label.toLowerCase(), c.value],
+    [c.slug.replace(/-/g, " "), c.value],
+  ]),
+);
 
 function extractCategories(text: string) {
   const categories: VendorCategoryValue[] = [];

@@ -46,7 +46,7 @@ export function VendorForm({ mode, brand, state: marketState, userId, serviceAre
         <input id="business_name" name="business_name" type="text" required maxLength={120} autoComplete="organization" defaultValue={values.business_name} className={inputClass} aria-invalid={Boolean(errors.business_name) || undefined} />
       </Field>
 
-      <Field id="category" label="Category" error={errors.category}>
+      <Field id="category" label="Category" hint={`Title companies choose ${vendorCategories.find((c) => c.value === "attorney")!.label}.`} error={errors.category}>
         <select id="category" name="category" required defaultValue={values.category} className={`${inputClass} bg-white`} aria-invalid={Boolean(errors.category) || undefined}>
           <option value="" disabled>
             Choose one

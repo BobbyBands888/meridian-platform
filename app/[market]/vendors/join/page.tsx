@@ -7,6 +7,7 @@ import { requireMarket } from "@/lib/market-data";
 import { brandName, countyList, isLive } from "@/lib/markets";
 import { VENDOR_CATEGORY_LIMIT_NOTE } from "@/lib/site";
 import { createClient } from "@/lib/supabase/server";
+import { categoryByValue } from "@/lib/vendors";
 import { joinVendorDirectory } from "./actions";
 import { VendorForm } from "./vendor-form";
 
@@ -15,7 +16,7 @@ export async function generateMetadata({ params }: PageProps<"/[market]/vendors/
   const brand = brandName(market);
   return {
     title: isLive(market) ? "Join the vendor directory" : "Pre-register as a founding vendor",
-    description: `${market.name} attorneys, home inspectors, photographers, painters, handymen, and lenders: join the ${brand} vendor directory and hear from local buyers and FSBO sellers.`,
+    description: `${market.name} closing attorneys, title companies, home inspectors, photographers, painters, handymen, and lenders: join the ${brand} vendor directory and hear from local buyers and FSBO sellers.`,
     alternates: { canonical: "/vendors/join" },
   };
 }
@@ -53,6 +54,11 @@ export default async function JoinPage({ params }: PageProps<"/[market]/vendors/
           </p>
           <p className="mt-2 text-[15px] leading-relaxed">{VENDOR_CATEGORY_LIMIT_NOTE}</p>
         </div>
+        <p className="mt-4 text-[15px] leading-relaxed text-muted">
+          <span className="font-medium text-ink">Title companies:</span> join under{" "}
+          <span className="font-medium text-ink">{categoryByValue("attorney").label}</span>, alongside closing attorneys. FSBO sellers
+          look there when they&apos;re lining up who will handle their closing.
+        </p>
 
         {user ? (
           <div className="mt-10">
