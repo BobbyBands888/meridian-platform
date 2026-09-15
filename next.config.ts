@@ -10,6 +10,7 @@ const nextConfig: NextConfig = {
     "/guides": ["./content/guides/**/*.md"],
     "/guides/[slug]": ["./content/guides/**/*.md"],
     "/sitemap.xml": ["./content/guides/**/*.md"],
+    "/sell/checklist": ["./content/checklist.md"],
   },
   images: {
     // Listing photos and vendor headshots are served from Supabase Storage public buckets.

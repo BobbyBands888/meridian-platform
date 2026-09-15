@@ -3,9 +3,17 @@
 import Link from "next/link";
 import { useSyncExternalStore } from "react";
 
-export type ChecklistStep = { id: string; title: string; body: string; link?: { href: string; label: string } };
+export type ChecklistStepView = {
+  id: string;
+  number: number;
+  title: string;
+  body: string;
+  links: { href: string; label: string }[];
+};
 
-const STORAGE_KEY = "nb-presale-checklist";
+export type ChecklistSectionView = { number: number; title: string; steps: ChecklistStepView[] };
+
+const STORAGE_KEY = "nb-presale-checklist-v2";
 const CHANGE_EVENT = "nb-checklist-change";
 
 // Per-browser convenience only; nothing is sent to the server.
@@ -35,7 +43,7 @@ function subscribe(onChange: () => void) {
   };
 }
 
-export function Checklist({ steps }: { steps: ChecklistStep[] }) {
+export function Checklist({ sections }: { sections: ChecklistSectionView[] }) {
   const raw = useSyncExternalStore(subscribe, readDone, () => "[]");
   let done: string[] = [];
   try {
@@ -43,54 +51,78 @@ export function Checklist({ steps }: { steps: ChecklistStep[] }) {
   } catch {
     done = [];
   }
-  const doneCount = steps.filter((s) => done.includes(s.id)).length;
-
+  const allSteps = sections.flatMap((s) => s.steps);
+  const doneCount = allSteps.filter((s) => done.includes(s.id)).length;
   const toggle = (id: string) => writeDone(done.includes(id) ? done.filter((d) => d !== id) : [...done, id]);
 
   return (
     <div className="max-w-3xl">
-      <div className="flex items-center justify-between gap-4">
-        <p className="text-[15px] font-medium" aria-live="polite">
-          {doneCount} of {steps.length} done
-        </p>
-        {doneCount > 0 && (
-          <button type="button" onClick={() => writeDone([])} className="text-[14px] text-muted underline underline-offset-2 hover:text-ink">
-            Start over
-          </button>
-        )}
-      </div>
-      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface" aria-hidden="true">
-        <div className="h-full rounded-full bg-forest transition-[width]" style={{ width: `${(doneCount / steps.length) * 100}%` }} />
+      <div className="sticky top-16 z-10 -mx-4 bg-white/95 px-4 py-3 backdrop-blur sm:mx-0 sm:px-0">
+        <div className="flex items-center justify-between gap-4">
+          <p className="text-[15px] font-medium" aria-live="polite">
+            {doneCount} of {allSteps.length} done
+          </p>
+          {doneCount > 0 && (
+            <button type="button" onClick={() => writeDone([])} className="text-[14px] text-muted underline underline-offset-2 hover:text-ink">
+              Start over
+            </button>
+          )}
+        </div>
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface" aria-hidden="true">
+          <div className="h-full rounded-full bg-forest transition-[width]" style={{ width: `${allSteps.length ? (doneCount / allSteps.length) * 100 : 0}%` }} />
+        </div>
       </div>
 
-      <ol className="mt-6 divide-y divide-line rounded-2xl border border-line">
-        {steps.map((step, i) => {
-          const checked = done.includes(step.id);
+      <div className="mt-6 space-y-10">
+        {sections.map((section) => {
+          const sectionDone = section.steps.filter((s) => done.includes(s.id)).length;
           return (
-            <li key={step.id} className="flex gap-4 p-4 sm:p-5">
-              <input
-                id={`step-${step.id}`}
-                type="checkbox"
-                checked={checked}
-                onChange={() => toggle(step.id)}
-                className="mt-1 h-5 w-5 shrink-0 cursor-pointer accent-[#1f4d3a]"
-              />
-              <div className="min-w-0 flex-1">
-                <label htmlFor={`step-${step.id}`} className={`block cursor-pointer text-[17px] font-semibold ${checked ? "text-muted line-through" : ""}`}>
-                  <span className="sr-only">Step {i + 1}: </span>
-                  {step.title}
-                </label>
-                <p className="mt-1 text-[15px] leading-relaxed text-muted">{step.body}</p>
-                {step.link && (
-                  <Link href={step.link.href} className="mt-2 inline-block text-[15px] font-medium text-forest hover:underline">
-                    {step.link.label} →
-                  </Link>
-                )}
+            <section key={section.number} aria-labelledby={`section-${section.number}`}>
+              <div className="flex items-baseline justify-between gap-4">
+                <h2 id={`section-${section.number}`} className="text-2xl font-bold tracking-tight">
+                  <span className="text-muted">Section {section.number} · </span>
+                  {section.title}
+                </h2>
+                <span className="shrink-0 text-[14px] text-muted">
+                  {sectionDone}/{section.steps.length}
+                </span>
               </div>
-            </li>
+              <ol className="mt-4 divide-y divide-line rounded-2xl border border-line">
+                {section.steps.map((step) => {
+                  const checked = done.includes(step.id);
+                  return (
+                    <li key={step.id} className="flex gap-4 p-4 sm:p-5">
+                      <input
+                        id={step.id}
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggle(step.id)}
+                        className="mt-1 h-5 w-5 shrink-0 cursor-pointer accent-[#1f4d3a]"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <label htmlFor={step.id} className={`block cursor-pointer text-[17px] font-semibold leading-snug ${checked ? "text-muted line-through" : ""}`}>
+                          <span className="text-muted">{step.number}. </span>
+                          {step.title}
+                        </label>
+                        {step.body && <p className="mt-1.5 text-[15px] leading-relaxed text-muted">{step.body}</p>}
+                        {step.links.length > 0 && (
+                          <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+                            {step.links.map((link) => (
+                              <Link key={link.href} href={link.href} className="text-[15px] font-medium text-forest hover:underline">
+                                {link.label} →
+                              </Link>
+                            ))}
+                          </p>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ol>
+            </section>
           );
         })}
-      </ol>
+      </div>
     </div>
   );
 }
