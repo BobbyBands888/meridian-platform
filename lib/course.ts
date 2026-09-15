@@ -45,7 +45,7 @@ const dayIntros = [
 /** Slug fragments that point a day at the guide it should link to, most specific first. */
 const dayGuideHints: string[][] = [
   ["price", "pricing"],
-  ["without-a-realtor", "without-an-agent"],
+  ["how-to-sell", "sell-your-house", "sell-your-home"],
   ["disclosure"],
   ["showing", "safety"],
   ["attorney", "title"],
@@ -53,14 +53,16 @@ const dayGuideHints: string[][] = [
   ["attorney", "title", "closing"],
 ];
 
+/** The market's overview guide, used when a day has no closer match. */
+const OVERVIEW = /how-to-sell|sell-your-house|sell-your-home|without-an-agent/;
+
 function guideForDay(day: number, guides: GuideMeta[]): GuideMeta | null {
   const hints = dayGuideHints[day - 1] ?? [];
   for (const hint of hints) {
     const match = guides.find((g) => g.slug.includes(hint));
     if (match) return match;
   }
-  // Fall back to the market's "how to sell without an agent" overview, then to anything at all.
-  return guides.find((g) => /without-a-realtor|without-an-agent/.test(g.slug)) ?? guides[0] ?? null;
+  return guides.find((g) => OVERVIEW.test(g.slug)) ?? guides[0] ?? null;
 }
 
 function categoryForSection(section: ChecklistSection, active: VendorCategoryValue[]): VendorCategoryValue | null {
