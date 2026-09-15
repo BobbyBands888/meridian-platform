@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 const notices: Record<string, string> = {
   submitted: "Received — you'll be live within 24 hours. We sent a confirmation to your email.",
   saved: "Your changes were saved.",
-  "edit-pending": "Your changes to your business name, bio, or headshot were sent for review. Your current profile stays live until they're approved.",
+  "edit-pending": "Your changes to your business name, category, bio, or headshot were sent for review. Your current profile stays live until they're approved.",
   resubmitted: "Your updated profile was resubmitted for review.",
 };
 
@@ -99,7 +99,7 @@ export default async function VendorDashboardPage({ searchParams }: PageProps<"/
                 Submitted {new Date(pending.submitted_at).toLocaleDateString("en-US", { month: "long", day: "numeric" })}. Your live
                 profile above stays up until these are approved.
               </p>
-              <ProfileSummary vendor={{ ...vendor, ...pending }} categoryLabel={category.singular} compact />
+              <ProfileSummary vendor={{ ...vendor, ...pending }} categoryLabel={categoryByValue(pending.category).singular} compact />
             </div>
           )}
         </section>

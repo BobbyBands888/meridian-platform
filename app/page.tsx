@@ -1,8 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ListingCard } from "@/components/listing-card";
+import { CardGrid } from "@/components/photo-card";
 import { SearchBar } from "@/components/search-bar";
 import { ButtonLink, Container } from "@/components/ui";
-import { site, vendorCategories } from "@/lib/site";
+import { getActiveListings } from "@/lib/public-listings";
+import { getActiveVendorCategories } from "@/lib/public-vendors";
+import { site } from "@/lib/site";
+
+export const revalidate = 300;
 
 export const metadata: Metadata = {
   alternates: { canonical: "/" },
@@ -23,7 +29,9 @@ const steps = [
   },
 ];
 
-export default function HomePage() {
+export default async function HomePage() {
+  const [vendorCategories, newestHomes] = await Promise.all([getActiveVendorCategories(), getActiveListings({}, 3)]);
+
   return (
     <>
       <section className="border-b border-line">
@@ -34,6 +42,28 @@ export default function HomePage() {
           </div>
         </Container>
       </section>
+
+      {newestHomes.length > 0 && (
+        <section aria-labelledby="newest-heading">
+          <Container className="pt-16 sm:pt-20">
+            <div className="flex items-end justify-between gap-4">
+              <h2 id="newest-heading" className="text-3xl font-bold tracking-tight sm:text-4xl">
+                Newest homes
+              </h2>
+              <Link href="/homes" className="shrink-0 text-[15px] font-semibold text-forest hover:underline">
+                See all homes
+              </Link>
+            </div>
+            <div className="mt-8">
+              <CardGrid>
+                {newestHomes.map((listing) => (
+                  <ListingCard key={listing.id} listing={listing} />
+                ))}
+              </CardGrid>
+            </div>
+          </Container>
+        </section>
+      )}
 
       <section aria-labelledby="how-heading">
         <Container className="py-16 sm:py-20">
@@ -52,38 +82,40 @@ export default function HomePage() {
         </Container>
       </section>
 
-      <section aria-labelledby="vendors-heading" className="bg-surface">
-        <Container className="py-16 sm:py-20">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <h2 id="vendors-heading" className="text-3xl font-bold tracking-tight sm:text-4xl">
-                Local pros for every step
-              </h2>
-              <p className="mt-3 max-w-xl text-[17px] leading-relaxed text-muted">
-                Every vendor certifies they are licensed and insured before we approve their profile.
-              </p>
+      {vendorCategories.length > 0 && (
+        <section aria-labelledby="vendors-heading" className="bg-surface">
+          <Container className="py-16 sm:py-20">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h2 id="vendors-heading" className="text-3xl font-bold tracking-tight sm:text-4xl">
+                  Local pros for every step
+                </h2>
+                <p className="mt-3 max-w-xl text-[17px] leading-relaxed text-muted">
+                  Every vendor certifies they are licensed and insured before we approve their profile.
+                </p>
+              </div>
+              <Link href="/vendors" className="text-[15px] font-semibold text-forest hover:underline">
+                All vendors
+              </Link>
             </div>
-            <Link href="/vendors" className="text-[15px] font-semibold text-forest hover:underline">
-              All vendors
-            </Link>
-          </div>
-          <ul className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {vendorCategories.map((category) => (
-              <li key={category.slug}>
-                <Link
-                  href={`/vendors/${category.slug}`}
-                  className="flex min-h-20 items-center justify-between rounded-xl border border-line bg-white px-5 text-[17px] font-semibold transition-colors hover:border-forest hover:text-forest"
-                >
-                  {category.label}
-                  <span aria-hidden="true" className="text-muted">
-                    →
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </Container>
-      </section>
+            <ul className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {vendorCategories.map((category) => (
+                <li key={category.slug}>
+                  <Link
+                    href={`/vendors/${category.slug}`}
+                    className="flex min-h-20 items-center justify-between rounded-xl border border-line bg-white px-5 text-[17px] font-semibold transition-colors hover:border-forest hover:text-forest"
+                  >
+                    {category.label}
+                    <span aria-hidden="true" className="text-muted">
+                      →
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </Container>
+        </section>
+      )}
 
       <section aria-labelledby="sell-heading">
         <Container className="py-16 sm:py-24">

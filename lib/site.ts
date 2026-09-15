@@ -22,8 +22,10 @@ export const vendorCategories = [
   { value: "home_inspector", slug: "home-inspectors", label: "Home Inspectors", singular: "Home Inspector" },
   { value: "photographer", slug: "photographers", label: "Photographers", singular: "Photographer" },
   { value: "painter", slug: "painters", label: "Painters", singular: "Painter" },
+  { value: "stager", slug: "stagers", label: "Stagers", singular: "Stager" },
   { value: "handyman", slug: "handymen", label: "Handymen", singular: "Handyman" },
   { value: "lender", slug: "lenders", label: "Lenders", singular: "Lender" },
+  { value: "home_insurance", slug: "home-insurance", label: "Home Insurance", singular: "Home Insurance" },
 ] as const;
 
 export type VendorCategory = (typeof vendorCategories)[number]["value"];

@@ -123,7 +123,7 @@ export async function updateVendorProfile(_prev: VendorFormState, formData: Form
   if (!before) redirect("/vendors/join");
   const { data: pendingBefore } = await supabase
     .from("vendor_pending_edits")
-    .select("business_name, bio, headshot_url")
+    .select("business_name, bio, headshot_url, category")
     .eq("vendor_id", before.id)
     .maybeSingle();
 
@@ -150,11 +150,15 @@ export async function updateVendorProfile(_prev: VendorFormState, formData: Form
 
   if (before.status === "approved") {
     const matchesLive =
-      values.business_name === before.business_name && values.bio === before.bio && values.headshot_url === before.headshot_url;
+      values.business_name === before.business_name &&
+      values.bio === before.bio &&
+      values.headshot_url === before.headshot_url &&
+      values.category === before.category;
     const sameAsPending =
       pendingBefore?.business_name === values.business_name &&
       pendingBefore?.bio === values.bio &&
-      pendingBefore?.headshot_url === values.headshot_url;
+      pendingBefore?.headshot_url === values.headshot_url &&
+      pendingBefore?.category === values.category;
 
     if (matchesLive && pendingBefore) {
       // Reviewed fields were put back to what's live: withdraw the pending edit.
@@ -163,12 +167,13 @@ export async function updateVendorProfile(_prev: VendorFormState, formData: Form
         p_business_name: before.business_name,
         p_bio: before.bio,
         p_headshot_url: before.headshot_url,
+        p_category: before.category,
       });
     } else if (!matchesLive) {
       outcome = "edit-pending";
       if (!sameAsPending) await sendAdminVendorEdit({ id: before.id, business_name: values.business_name, category: values.category as VendorCategoryValue, email });
     }
-    // Service area, pricing, website, and category apply immediately.
+    // Service area, pricing, and website apply immediately.
     updateTag(CACHE_TAGS.vendors);
   } else if (before.status === "rejected") {
     outcome = "resubmitted";

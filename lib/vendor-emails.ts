@@ -38,7 +38,7 @@ export function sendAdminVendorEdit(vendor: VendorInfo & { email: string }) {
     subject: `Vendor edit to approve: ${vendor.business_name}`,
     heading: "A vendor edited their profile",
     blocks: [
-      { kind: "p", text: "Their approved profile stays live until you approve the changes." },
+      { kind: "p", text: "They changed their business name, category, bio, or headshot. Their approved profile stays live until you approve the changes." },
       { kind: "rows", rows: [["Business", vendor.business_name], ["Account", vendor.email]] },
       { kind: "button", label: "Review the edit", href: reviewLink(vendor.id) },
     ],

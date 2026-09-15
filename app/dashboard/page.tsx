@@ -72,10 +72,12 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
           </h2>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <div className="rounded-xl bg-surface p-5">
-              <h3 className="font-semibold">Selling a home?</h3>
-              <p className="mt-1 text-[15px] leading-relaxed text-muted">List it free and hear from buyers directly.</p>
-              <ButtonLink href="/sell" className="mt-4">
-                List your home
+              <h3 className="font-semibold">{profile.roles.includes("seller") ? "Your listing" : "Selling a home?"}</h3>
+              <p className="mt-1 text-[15px] leading-relaxed text-muted">
+                {profile.roles.includes("seller") ? "Update price, photos, and status, and read inquiries." : "List it free and hear from buyers directly."}
+              </p>
+              <ButtonLink href={profile.roles.includes("seller") ? "/dashboard/listing" : "/sell"} className="mt-4">
+                {profile.roles.includes("seller") ? "Manage listing" : "List your home"}
               </ButtonLink>
             </div>
             <div className="rounded-xl bg-surface p-5">

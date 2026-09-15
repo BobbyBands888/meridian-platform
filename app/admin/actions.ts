@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { getCurrentProfile } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CACHE_TAGS } from "@/lib/supabase/public";
+import { sendListingApproved, sendListingRejected } from "@/lib/listing-emails";
 import { sendVendorApproved, sendVendorEditApproved, sendVendorEditDeclined, sendVendorRejected } from "@/lib/vendor-emails";
 
 async function assertAdmin() {
@@ -71,4 +72,39 @@ export async function declineVendorEdit(formData: FormData) {
   if (error) throw new Error(error.message);
   await sendVendorEditDeclined(vendor.profiles.email, vendor, note);
   redirect(`/admin/vendors/${vendorId}?done=edit-declined`);
+}
+
+async function loadListing(listingId: string) {
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("listings")
+    .select("id, slug, street, city, zip, hide_exact_address, price, status, profiles!inner(email)")
+    .eq("id", listingId)
+    .single();
+  if (!data) throw new Error("Listing not found.");
+  return { admin, listing: data };
+}
+
+export async function approveListing(formData: FormData) {
+  await assertAdmin();
+  const listingId = String(formData.get("listing_id"));
+  const { admin, listing } = await loadListing(listingId);
+  const { error } = await admin.from("listings").update({ status: "active" }).eq("id", listingId);
+  if (error) throw new Error(error.message);
+  await sendListingApproved(listing.profiles.email, listing);
+  updateTag(CACHE_TAGS.listings);
+  redirect(`/admin/listings/${listingId}?done=approved`);
+}
+
+export async function rejectListing(formData: FormData) {
+  await assertAdmin();
+  const listingId = String(formData.get("listing_id"));
+  const note = String(formData.get("note") ?? "").trim().slice(0, 2000);
+  const { admin, listing } = await loadListing(listingId);
+  const wasPublic = ["active", "under_contract", "sold"].includes(listing.status);
+  const { error } = await admin.from("listings").update({ status: "rejected" }).eq("id", listingId);
+  if (error) throw new Error(error.message);
+  await sendListingRejected(listing.profiles.email, listing, note);
+  if (wasPublic) updateTag(CACHE_TAGS.listings);
+  redirect(`/admin/listings/${listingId}?done=rejected`);
 }

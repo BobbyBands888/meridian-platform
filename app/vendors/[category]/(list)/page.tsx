@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { CardGrid } from "@/components/photo-card";
 import { ButtonLink, Container, EmptyState, PageHeader } from "@/components/ui";
 import { VendorCard } from "@/components/vendor-card";
+import { getActiveVendorCategories } from "@/lib/public-vendors";
 import { vendorCategories } from "@/lib/site";
 import { CACHE_TAGS, createPublicClient } from "@/lib/supabase/public";
 import { categoryBySlug } from "@/lib/vendors";
@@ -22,7 +23,9 @@ export function generateStaticParams() {
 export async function generateMetadata({ params }: PageProps<"/vendors/[category]">): Promise<Metadata> {
   const { category: slug } = await params;
   if (slug === ALL.slug) {
+    const anyVendors = (await getActiveVendorCategories()).length > 0;
     return {
+      robots: anyVendors ? undefined : { index: false },
       title: "All Nashville real estate vendors",
       description: "Every approved vendor on Nashville Buys: attorneys, inspectors, photographers, painters, handymen, and lenders.",
       alternates: { canonical: "/vendors/all" },
@@ -30,11 +33,18 @@ export async function generateMetadata({ params }: PageProps<"/vendors/[category
   }
   const category = categoryBySlug(slug);
   if (!category) return {};
+  const active = await getActiveVendorCategories();
   return {
     title: `${category.label} in Nashville, TN`,
     description: `Nashville ${category.label.toLowerCase()} for home buyers and FSBO sellers. Contact them directly through Nashville Buys.`,
     alternates: { canonical: `/vendors/${category.slug}` },
+    // Empty categories stay reachable by URL but are kept out of search results and navigation.
+    robots: active.some((c) => c.slug === category.slug) ? undefined : { index: false },
   };
+}
+
+function chipOrder(slug: string) {
+  return slug === ALL.slug ? -1 : vendorCategories.findIndex((c) => c.slug === slug);
 }
 
 export default async function VendorCategoryPage({ params }: PageProps<"/vendors/[category]">) {
@@ -49,13 +59,17 @@ export default async function VendorCategoryPage({ params }: PageProps<"/vendors
   if (error) throw new Error(`Could not load vendors: ${error.message}`);
 
   const label = category?.label ?? ALL.label;
+  const activeCategories = await getActiveVendorCategories();
+  const chips = [ALL, ...activeCategories.filter((c) => c.slug !== slug), ...(category ? [category] : [])].sort(
+    (a, b) => chipOrder(a.slug) - chipOrder(b.slug),
+  );
 
   return (
     <>
       <PageHeader title={category ? `${label} in Nashville` : "All Nashville vendors"}>
         <nav aria-label="Vendor categories" className="mt-6 -mx-4 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <ul className="flex gap-2 whitespace-nowrap">
-            {[ALL, ...vendorCategories].map((c) => {
+            {chips.map((c) => {
               const active = c.slug === slug;
               return (
                 <li key={c.slug}>

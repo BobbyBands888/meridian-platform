@@ -31,8 +31,8 @@ export default async function EditVendorPage() {
         <h1 className="mt-4 text-4xl font-bold tracking-tight">Edit your profile</h1>
         {vendor.status === "approved" && (
           <p className="mt-3 text-[15px] leading-relaxed text-muted">
-            Changes to your business name, bio, or headshot are reviewed before they go live. Your current profile stays up
-            in the meantime. Service area, pricing, website, and category update right away.
+            Changes to your business name, category, bio, or headshot are reviewed before they go live. Your current profile
+            stays up in the meantime. Service area, pricing, and website update right away.
           </p>
         )}
         {vendor.status === "rejected" && (
@@ -46,7 +46,7 @@ export default async function EditVendorPage() {
             submitLabel={vendor.status === "rejected" ? "Save and resubmit" : "Save changes"}
             initial={{
               business_name: reviewed.business_name,
-              category: vendor.category,
+              category: reviewed.category,
               headshot_url: reviewed.headshot_url,
               bio: reviewed.bio,
               service_area: vendor.service_area,

@@ -37,6 +37,10 @@ Run each file in `supabase/migrations/` in filename order, once each (re-running
 
 1. `20260914000000_initial_schema.sql` (Phase 2)
 2. `20260915000000_vendor_directory.sql` (Phase 3: vendor signup, held edits)
+3. `20260916000000_listings.sql` (Phase 4: listings, stager and home insurance categories, category edits held for review)
+4. `20260917000000_listing_city.sql` (Phase 4: listing city for Middle Tennessee ZIP codes)
+
+If you ever re-run an earlier file, re-run every later file after it too, since later files replace some of its functions.
 
 For each: open **Supabase → SQL Editor → New query**, paste the full file, and click **Run**. Supabase may warn that the query contains destructive operations: it drops and recreates its own policies and triggers so the file can be re-run. Confirm to continue.
 

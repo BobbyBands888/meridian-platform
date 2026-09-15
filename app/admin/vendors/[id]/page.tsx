@@ -78,7 +78,7 @@ export default async function AdminVendorPage({ params, searchParams }: PageProp
           <h2 id="live-heading" className="text-lg font-semibold">
             {vendor.status === "approved" ? "Live version" : "Submitted profile"}
           </h2>
-          <VendorDetails business_name={vendor.business_name} bio={vendor.bio} headshot_url={vendor.headshot_url} />
+          <VendorDetails business_name={vendor.business_name} bio={vendor.bio} headshot_url={vendor.headshot_url} categoryLabel={category.singular} />
           <dl className="mt-4 space-y-2 border-t border-line pt-4 text-[15px]">
             <Row label="Service area" value={vendor.service_area} />
             <Row label="Price range" value={vendor.price_range} />
@@ -97,10 +97,12 @@ export default async function AdminVendorPage({ params, searchParams }: PageProp
               business_name={pending.business_name}
               bio={pending.bio}
               headshot_url={pending.headshot_url}
+              categoryLabel={categoryByValue(pending.category).singular}
               changed={{
                 business_name: pending.business_name !== vendor.business_name,
                 bio: pending.bio !== vendor.bio,
                 headshot_url: pending.headshot_url !== vendor.headshot_url,
+                category: pending.category !== vendor.category,
               }}
             />
             <div className="mt-6 space-y-4 border-t border-line pt-5">
@@ -170,12 +172,14 @@ function VendorDetails({
   business_name,
   bio,
   headshot_url,
+  categoryLabel,
   changed,
 }: {
   business_name: string;
   bio: string;
   headshot_url: string;
-  changed?: { business_name: boolean; bio: boolean; headshot_url: boolean };
+  categoryLabel: string;
+  changed?: { business_name: boolean; bio: boolean; headshot_url: boolean; category: boolean };
 }) {
   const mark = (on?: boolean) => (on ? <span className="ml-2 rounded bg-warm/20 px-1.5 py-0.5 text-[12px] font-medium">Changed</span> : null);
   return (
@@ -187,6 +191,10 @@ function VendorDetails({
         {mark(changed?.headshot_url)}
       </div>
       <div className="min-w-0">
+        <p className="text-[14px] font-medium text-forest">
+          {categoryLabel}
+          {mark(changed?.category)}
+        </p>
         <p className="text-lg font-semibold">
           {business_name}
           {mark(changed?.business_name)}

@@ -4,7 +4,15 @@
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export type UserRole = "buyer" | "seller" | "vendor";
-export type VendorCategoryValue = "attorney" | "home_inspector" | "photographer" | "painter" | "handyman" | "lender";
+export type VendorCategoryValue =
+  | "attorney"
+  | "home_inspector"
+  | "photographer"
+  | "painter"
+  | "stager"
+  | "handyman"
+  | "lender"
+  | "home_insurance";
 export type VendorStatus = "pending" | "approved" | "rejected";
 export type ListingStatus = "pending" | "active" | "under_contract" | "sold" | "rejected";
 export type LeadType = "listing" | "vendor";
@@ -58,6 +66,7 @@ type VendorPendingEditRow = {
   business_name: string;
   bio: string;
   headshot_url: string;
+  category: VendorCategoryValue;
   submitted_at: string;
 };
 
@@ -179,10 +188,26 @@ export type Database = {
         Returns: string;
       };
       queue_vendor_edit: {
-        Args: { p_vendor_id: string; p_business_name: string; p_bio: string; p_headshot_url: string };
+        Args: { p_vendor_id: string; p_business_name: string; p_bio: string; p_headshot_url: string; p_category: VendorCategoryValue };
         Returns: undefined;
       };
       apply_vendor_edit: { Args: { p_vendor_id: string }; Returns: boolean };
+      submit_listing: {
+        Args: {
+          p_street: string;
+          p_city: string;
+          p_zip: string;
+          p_hide_exact_address: boolean;
+          p_price: number;
+          p_beds: number;
+          p_baths: number;
+          p_sqft: number | null;
+          p_description: string;
+          p_photo_urls: string[];
+        };
+        Returns: { id: string; slug: string }[];
+      };
+      replace_listing_photos: { Args: { p_listing_id: string; p_photo_urls: string[] }; Returns: undefined };
     };
     Enums: {
       user_role: UserRole;
@@ -201,4 +226,5 @@ export type VendorPendingEdit = VendorPendingEditRow;
 export type PublicVendor = Database["public"]["Views"]["public_vendors"]["Row"];
 export type Listing = ListingRow;
 export type ListingPhoto = ListingPhotoRow;
+export type PublicListing = Database["public"]["Views"]["public_listings"]["Row"];
 export type Lead = LeadRow;
