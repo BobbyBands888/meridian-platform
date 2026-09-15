@@ -5,8 +5,7 @@ export const LISTING_PHOTO_MAX = 20;
 export const DESCRIPTION_MIN = 50;
 export const DESCRIPTION_MAX = 5000;
 
-// Updated in Phase 6 when the disclosure guide is published.
-export const DISCLOSURE_GUIDE_PATH = "/guides";
+export const DISCLOSURE_GUIDE_PATH = "/guides/tennessee-property-disclosure-form";
 
 const priceFmt = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const numberFmt = new Intl.NumberFormat("en-US");

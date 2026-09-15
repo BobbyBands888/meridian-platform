@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { getGuides } from "@/lib/guides";
 import { getSitemapListings } from "@/lib/public-listings";
 import { getActiveVendorCategories } from "@/lib/public-vendors";
 import { site } from "@/lib/site";
@@ -49,5 +50,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     lastModified: new Date(l.updated_at),
   }));
 
-  return [...staticPages, ...listingPages, ...vendorPages];
+  const guidePages: MetadataRoute.Sitemap = (await getGuides()).map((g) => ({
+    url: `${site.url}/guides/${g.slug}`,
+    changeFrequency: "monthly",
+    priority: 0.7,
+    lastModified: new Date(`${g.updatedAt}T12:00:00Z`),
+  }));
+
+  return [...staticPages, ...guidePages, ...listingPages, ...vendorPages];
 }

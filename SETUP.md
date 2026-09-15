@@ -156,6 +156,23 @@ Protects every public form: sign-in and the contact forms on vendor profiles and
 
 For local development, use Cloudflare's test keys so forms work on localhost: site key `1x00000000000000000000AA` and secret `1x0000000000000000000000000000000AA` (always passes). The secret `2x0000000000000000000000000000000AA` always fails, which is useful for checking that blocked submissions are rejected.
 
+## Guides
+
+Guides are markdown files in `content/guides/`. The filename is the URL slug (`content/guides/my-guide.md` becomes `/guides/my-guide`). Each file starts with front matter:
+
+```md
+---
+title: Page heading
+seoTitle: Title for search results (optional; defaults to title)
+description: One or two sentences for search results and link previews.
+publishedAt: 2026-09-15
+updatedAt: 2026-10-01 (optional)
+vendorCategories: [attorney, home_inspector]
+---
+```
+
+`vendorCategories` uses the category values (attorney, home_inspector, photographer, painter, stager, handyman, lender, home_insurance) to show matching vendor cards under the guide. Commit and push a new or edited file; it goes live with the next deploy and is added to the sitemap automatically.
+
 ## Admin
 
 - `/admin` has three tabs: **Pending Vendors** (new applications and edits to live profiles), **Pending Listings**, and **All Leads**. Approve and reject buttons send the matching email. Open a row's Review page to add a note to a rejection.

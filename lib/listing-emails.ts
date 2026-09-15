@@ -13,9 +13,9 @@ export function sendListingReceived(to: string, listing: ListingInfo) {
     heading: "We received your listing",
     blocks: [
       { kind: "p", text: `Thanks for listing ${label(listing)} at ${formatPrice(listing.price)}. We review every listing before it goes live, usually within 24 hours, and we'll email you when it's up.` },
-      { kind: "p", text: "Tennessee requires sellers to provide buyers a Residential Property Condition Disclosure. Our guides explain it." },
+      { kind: "p", text: "Tennessee requires sellers to provide buyers a Residential Property Condition Disclosure. Our guide explains what it covers." },
       { kind: "button", label: "See the pre-sale checklist", href: siteLink("/sell/checklist") },
-      { kind: "p", text: `Read the guides: ${siteLink(DISCLOSURE_GUIDE_PATH)}` },
+      { kind: "p", text: `Disclosure guide: ${siteLink(DISCLOSURE_GUIDE_PATH)}` },
     ],
   });
 }
