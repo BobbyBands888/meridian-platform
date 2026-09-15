@@ -10,6 +10,7 @@ import { brandName, isLive, marketUrl, type Market } from "@/lib/markets";
 import { getInquiries, getInquiryCounts } from "@/lib/leads";
 import { formatUsPhone } from "@/lib/phone";
 import { formatReviewDate, licenseRequired, verifiedBadgeText } from "@/lib/verification";
+import { BadgeCard } from "./badge-card";
 import { VerificationCard } from "./verification-card";
 import { createClient } from "@/lib/supabase/server";
 import { categoryByValue, vendorPath } from "@/lib/vendors";
@@ -121,7 +122,7 @@ export default async function VendorDashboardPage({ params: routeParams, searchP
       </section>
 
       {vendor.status === "approved" && live && (
-        <div className="mt-6">
+        <div className="mt-6 space-y-6">
           <VerificationCard
             userId={profile.id}
             brand={brand}
@@ -131,6 +132,7 @@ export default async function VendorDashboardPage({ params: routeParams, searchP
             submittedLabel={verification?.submitted_at ? formatReviewDate(market, verification.submitted_at) : null}
             badgeText={verification?.verified_at ? verifiedBadgeText(market, verification.verified_at) : null}
           />
+          <BadgeCard market={market} vendor={{ ...vendor, verified_at: verification?.verified_at ?? null }} />
         </div>
       )}
 

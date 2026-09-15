@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { CommissionCalculator } from "@/components/commission-calculator";
 import { ListingAlertsForm } from "@/components/listing-alerts-form";
 import { ListingCard } from "@/components/listing-card";
 import { CardGrid } from "@/components/photo-card";
@@ -7,7 +8,7 @@ import { SearchBar } from "@/components/search-bar";
 import { ButtonLink, Container } from "@/components/ui";
 import { getGuides } from "@/lib/guides";
 import { requireMarket } from "@/lib/market-data";
-import { isLive, marketTagline, type Market } from "@/lib/markets";
+import { brandName, isLive, marketTagline, type Market } from "@/lib/markets";
 import { getActiveListings } from "@/lib/public-listings";
 import { getActiveVendorCategories } from "@/lib/public-vendors";
 import { VENDOR_CATEGORY_LIMIT_NOTE } from "@/lib/site";
@@ -115,6 +116,20 @@ export default async function HomePage({ params }: PageProps<"/[market]">) {
             <div className="mt-6 max-w-3xl">
               <ListingAlertsForm />
             </div>
+          </div>
+        </Container>
+      </section>
+
+      <section aria-labelledby="commission-heading">
+        <Container className="pt-16 sm:pt-20">
+          <h2 id="commission-heading" className="text-3xl font-bold tracking-tight sm:text-4xl">
+            What commission costs
+          </h2>
+          <p className="mt-3 max-w-2xl text-[17px] leading-relaxed text-muted">
+            Move the slider to your price and see the commission a traditional sale pays.
+          </p>
+          <div className="mt-8 max-w-3xl">
+            <CommissionCalculator brand={brandName(market)} />
           </div>
         </Container>
       </section>
