@@ -51,6 +51,7 @@ Run each file in `supabase/migrations/` in filename order, once each (re-running
 9. `20260922000000_growth.sql` (Phase 9: signup market on profiles, expressions of interest, the seven-day email course, AI description usage)
 10. `20260923000000_service_area.sql` (Nashville's ten-county service area, out-of-area email waitlist)
 11. `20260924000000_listing_drafts.sql` (List without signing in first: unverified listing drafts, email confirmation at submit)
+12. `20260925000000_photos_and_funnel.sql` (Up to 50 photos per listing and draft, seller funnel event log)
 
 If you ever re-run an earlier file, re-run every later file after it too, since later files replace some of its functions.
 

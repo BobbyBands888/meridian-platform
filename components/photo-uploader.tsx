@@ -24,6 +24,8 @@ type Item = {
   url?: string;
   preview?: string;
   status: "queued" | "processing" | "uploading" | "done" | "error";
+  /** Upload progress, 0 to 100, while uploading. */
+  progress?: number;
   error?: string;
   name: string;
 };
@@ -47,6 +49,32 @@ type Props = {
 };
 
 const CONCURRENCY = 3;
+/** Long edge after resizing, and JPEG qualities tried in order (about 80%, lower only if a photo is still too big). */
+const PHOTO_MAX_DIMENSION = 2000;
+const PHOTO_QUALITIES = [0.8, 0.72, 0.64, 0.56];
+
+/**
+ * Uploads a file to Supabase Storage with XMLHttpRequest instead of fetch, which has no upload progress events. Sends
+ * the same multipart body supabase-js does. `url` is a signed upload URL, or the object URL with a user's session.
+ */
+function uploadWithProgress({ url, method, token, blob, onProgress }: { url: string; method: "POST" | "PUT"; token: string; blob: Blob; onProgress: (percent: number) => void }) {
+  return new Promise<void>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open(method, url);
+    xhr.setRequestHeader("apikey", process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "");
+    xhr.setRequestHeader("authorization", `Bearer ${token}`);
+    xhr.setRequestHeader("x-upsert", "false");
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+    };
+    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`upload failed: ${xhr.status}`)));
+    xhr.onerror = () => reject(new Error("upload failed"));
+    const body = new FormData();
+    body.append("cacheControl", "31536000");
+    body.append("", blob);
+    xhr.send(body);
+  });
+}
 
 export function PhotoUploader({ userId, name, initialUrls = [], error, onBusyChange, onUrlsChange, getUploadTarget, max = LISTING_PHOTO_MAX }: Props) {
   const inputId = useId();
@@ -54,6 +82,7 @@ export function PhotoUploader({ userId, name, initialUrls = [], error, onBusyCha
     initialUrls.map((url) => ({ id: url, url, status: "done", name: "photo" })),
   );
   const queue = useRef<{ id: string; file: File }[]>([]);
+  const [limitNotice, setLimitNotice] = useState("");
   const active = useRef(0);
   const previews = useRef(new Set<string>());
 
@@ -78,26 +107,32 @@ export function PhotoUploader({ userId, name, initialUrls = [], error, onBusyCha
   async function processOne(id: string, file: File) {
     try {
       update(id, { status: "processing" });
-      const blob = await prepareImage(file, { maxDimension: 2400, maxBytes: 1_500_000 });
+      const blob = await prepareImage(file, { maxDimension: PHOTO_MAX_DIMENSION, maxBytes: 1_500_000, qualities: PHOTO_QUALITIES });
       const preview = URL.createObjectURL(blob);
       previews.current.add(preview);
-      update(id, { status: "uploading", preview });
+      update(id, { status: "uploading", preview, progress: 0 });
 
-      const bucket = createClient().storage.from("listing-photos");
+      const base = `${process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, "")}/storage/v1/object`;
+      const onProgress = (progress: number) => update(id, { progress });
+      const supabase = createClient();
+      let publicUrl: string;
       if (getUploadTarget) {
         const target = await getUploadTarget();
         if ("error" in target) throw new Error(target.error);
-        const { error: uploadError } = await bucket.uploadToSignedUrl(target.path, target.token, blob, { contentType: "image/jpeg", cacheControl: "31536000" });
-        if (uploadError) throw new Error("Upload failed. Remove it and try again.");
-        update(id, { status: "done", url: target.publicUrl });
-        return;
+        const url = `${base}/upload/sign/listing-photos/${target.path}?token=${encodeURIComponent(target.token)}`;
+        await uploadWithProgress({ url, method: "PUT", token: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "", blob, onProgress });
+        publicUrl = target.publicUrl;
+      } else {
+        const session = (await supabase.auth.getSession()).data.session;
+        if (!session) throw new Error("Sign in again to upload photos.");
+        const path = `${userId}/${crypto.randomUUID()}.jpg`;
+        await uploadWithProgress({ url: `${base}/listing-photos/${path}`, method: "POST", token: session.access_token, blob, onProgress });
+        publicUrl = supabase.storage.from("listing-photos").getPublicUrl(path).data.publicUrl;
       }
-      const path = `${userId}/${crypto.randomUUID()}.jpg`;
-      const { error: uploadError } = await bucket.upload(path, blob, { contentType: "image/jpeg", cacheControl: "31536000", upsert: false });
-      if (uploadError) throw new Error("Upload failed. Remove it and try again.");
-      update(id, { status: "done", url: bucket.getPublicUrl(path).data.publicUrl });
+      update(id, { status: "done", url: publicUrl, progress: undefined });
     } catch (e) {
-      update(id, { status: "error", error: e instanceof Error ? e.message : "Couldn't process this photo." });
+      const message = e instanceof Error && !e.message.startsWith("upload failed") ? e.message : "Upload failed. Remove it and try again.";
+      update(id, { status: "error", error: message, progress: undefined });
     }
   }
 
@@ -114,8 +149,14 @@ export function PhotoUploader({ userId, name, initialUrls = [], error, onBusyCha
 
   function addFiles(files: FileList | null) {
     if (!files?.length) return;
-    const room = max - items.filter((i) => i.status !== "error").length;
-    const accepted = Array.from(files).slice(0, Math.max(0, room));
+    const room = Math.max(0, max - items.filter((i) => i.status !== "error").length);
+    const accepted = Array.from(files).slice(0, room);
+    const skipped = files.length - accepted.length;
+    setLimitNotice(
+      skipped > 0
+        ? `A listing can have up to ${max} photos, so ${skipped === 1 ? "1 photo wasn't" : `${skipped} photos weren't`} added. Remove some to make room.`
+        : "",
+    );
     const added = accepted.map((file) => ({ id: crypto.randomUUID(), file }));
     setItems((prev) => [...prev, ...added.map(({ id, file }) => ({ id, status: "queued" as const, name: file.name }))]);
     queue.current.push(...added);
@@ -123,6 +164,7 @@ export function PhotoUploader({ userId, name, initialUrls = [], error, onBusyCha
   }
 
   function remove(id: string) {
+    setLimitNotice("");
     queue.current = queue.current.filter((q) => q.id !== id);
     setItems((prev) => {
       const item = prev.find((i) => i.id === id);
@@ -160,7 +202,7 @@ export function PhotoUploader({ userId, name, initialUrls = [], error, onBusyCha
         <div>
           <span className="block text-[15px] font-medium">Photos</span>
           <p className="mt-1 text-[13px] text-muted">
-            Up to {max}. iPhone photos are fine. Drag to reorder; the first photo is the cover.
+            Up to {max}. iPhone photos are fine. Drag to reorder (press and hold on a phone); the first photo is the cover.
           </p>
         </div>
         <span className="shrink-0 text-[14px] text-muted" aria-live="polite">
@@ -218,6 +260,11 @@ export function PhotoUploader({ userId, name, initialUrls = [], error, onBusyCha
           e.target.value = "";
         }}
       />
+      {limitNotice && (
+        <p role="alert" className="mt-2 text-[14px] text-red-700">
+          {limitNotice}
+        </p>
+      )}
       <p className="sr-only" aria-live="polite">
         {busy ? `Uploading photos, ${doneCount} of ${count} done.` : ""}
       </p>
@@ -246,7 +293,19 @@ function SortableTile({ item, isCover, position, onRemove }: { item: Item; isCov
         {(item.status === "queued" || item.status === "processing" || item.status === "uploading") && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-white/70 text-[13px] text-muted">
             <Spinner />
-            {item.status === "uploading" ? "Uploading" : item.status === "processing" ? "Preparing" : "Waiting"}
+            {item.status === "uploading" ? `Uploading ${item.progress ?? 0}%` : item.status === "processing" ? "Preparing" : "Waiting"}
+            {item.status === "uploading" && (
+              <span
+                role="progressbar"
+                aria-label={`Photo ${position} upload`}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={item.progress ?? 0}
+                className="absolute inset-x-3 bottom-3 h-1.5 overflow-hidden rounded-full bg-ink/10"
+              >
+                <span className="block h-full rounded-full bg-forest transition-[width]" style={{ width: `${item.progress ?? 0}%` }} />
+              </span>
+            )}
           </div>
         )}
         {item.status === "error" && (

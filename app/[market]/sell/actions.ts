@@ -8,6 +8,7 @@ import { getCurrentProfile, getCurrentUser } from "@/lib/auth";
 import type { ListingStatus } from "@/lib/database.types";
 import { sendAdminDescriptionEdit, sendAdminNewListing, sendListingReceived } from "@/lib/listing-emails";
 import { cityForZip } from "@/lib/areas";
+import { logFunnelEvent } from "@/lib/funnel-log";
 import { formErrorState, readListingForm, validateNewListingFields, validateShared, type ListingFormState } from "@/lib/listing-form";
 import { getMarketById, getRequestMarket } from "@/lib/market-data";
 import { isLive } from "@/lib/markets";
@@ -83,7 +84,11 @@ export async function createListing(_prev: ListingFormState, formData: FormData)
     attachAiUsage(String(formData.get("draft_id") ?? ""), user.id, created.id),
   ]);
 
-  await track("submitted", { source: String(formData.get("source") ?? "") || "direct", verified: true }, { headers: await headers() }).catch(() => {});
+  const source = String(formData.get("source") ?? "") || "direct";
+  await Promise.all([
+    track("submitted", { source, verified: true }, { headers: await headers() }).catch(() => {}),
+    logFunnelEvent(market.id, "submitted", source),
+  ]);
   redirect("/sell/checklist?submitted=1");
 }
 

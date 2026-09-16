@@ -1,6 +1,11 @@
 // Client-side photo preparation: HEIC to JPEG, orientation fix, resize, and compression before upload.
 
-type PrepareOptions = { maxDimension: number; maxBytes: number };
+type PrepareOptions = {
+  maxDimension: number;
+  maxBytes: number;
+  /** JPEG qualities to try in order until the file fits under maxBytes. */
+  qualities?: number[];
+};
 type Source = { image: CanvasImageSource; width: number; height: number; close?: () => void };
 
 const HEIC_BRANDS = ["heic", "heix", "hevc", "hevx", "heim", "heis", "mif1", "msf1"];
@@ -43,7 +48,7 @@ function toJpeg(canvas: HTMLCanvasElement, quality: number) {
   );
 }
 
-export async function prepareImage(file: File, { maxDimension, maxBytes }: PrepareOptions): Promise<Blob> {
+export async function prepareImage(file: File, { maxDimension, maxBytes, qualities = [0.85, 0.75, 0.65, 0.55] }: PrepareOptions): Promise<Blob> {
   let source: Source;
   try {
     if (await isHeicFile(file)) {
@@ -72,7 +77,7 @@ export async function prepareImage(file: File, { maxDimension, maxBytes }: Prepa
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(source.image, 0, 0, canvas.width, canvas.height);
 
-      for (const quality of [0.85, 0.75, 0.65, 0.55]) {
+      for (const quality of qualities) {
         const blob = await toJpeg(canvas, quality);
         if (blob.size <= maxBytes) return blob;
       }

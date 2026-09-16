@@ -5,6 +5,7 @@ import { track } from "@vercel/analytics/server";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { isProfileComplete, safeNextPath } from "@/lib/auth";
+import { logFunnelEvent } from "@/lib/funnel-log";
 import { clearDraftCookie, finalizeDraft, isDraftId } from "@/lib/listing-drafts";
 import { getRequestMarket } from "@/lib/market-data";
 import { createClient } from "@/lib/supabase/server";
@@ -42,11 +43,15 @@ export async function confirmSignIn(formData: FormData) {
   const draftId = formData.get("draft");
   const email = claims?.claims?.email as string | undefined;
   if (isDraftId(draftId) && userId && email) {
-    const finalized = await finalizeDraft(await getRequestMarket(), draftId, { id: userId, email });
+    const market = await getRequestMarket();
+    const finalized = await finalizeDraft(market, draftId, { id: userId, email });
     if (finalized) {
       await clearDraftCookie();
       if (!finalized.already) {
-        await track("email_verified", { source: finalized.source ?? "direct" }, { headers: await headers() }).catch(() => {});
+        await Promise.all([
+          track("email_verified", { source: finalized.source ?? "direct" }, { headers: await headers() }).catch(() => {}),
+          logFunnelEvent(market.id, "email_verified", finalized.source, draftId),
+        ]);
       }
     } else {
       redirect("/sell?draft=unavailable");

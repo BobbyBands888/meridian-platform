@@ -3,11 +3,13 @@
 import { track } from "@vercel/analytics/server";
 import { headers } from "next/headers";
 import { enrollInCourse } from "@/lib/course";
+import { logFunnelEvent } from "@/lib/funnel-log";
 import {
   clearDraftCookie,
   clientIp,
   clientIpHash,
-  DRAFT_DAILY_LIMIT,
+  DRAFT_EMAIL_DAILY_LIMIT,
+  DRAFT_IP_DAILY_LIMIT,
   DRAFT_PHOTO_MAX,
   DRAFT_UPLOAD_LIMIT,
   draftPhotoFolder,
@@ -73,6 +75,7 @@ export async function startDraft(_prev: ContactFormState, formData: FormData): P
       console.error("draft contact update failed", error.code, error.message);
       return { status: "error", message: "We couldn't save your details. Please try again.", values };
     }
+    await logFunnelEvent(market.id, "contact_saved", existing.source, existing.id);
     return { status: "saved" };
   }
 
@@ -88,12 +91,12 @@ export async function startDraft(_prev: ContactFormState, formData: FormData): P
     console.error("draft limit check failed", byEmail.error?.message ?? byIp.error?.message);
     return { status: "error", message: "We couldn't save your details. Please try again.", values };
   }
-  if ((byEmail.count ?? 0) >= DRAFT_DAILY_LIMIT || (byIp.count ?? 0) >= DRAFT_DAILY_LIMIT) {
+  if ((byEmail.count ?? 0) >= DRAFT_EMAIL_DAILY_LIMIT || (byIp.count ?? 0) >= DRAFT_IP_DAILY_LIMIT) {
     return { status: "error", message: "You've started several listings today. Finish one you've started, or try again tomorrow.", values };
   }
 
   const token = newDraftToken();
-  const { error } = await admin.from("listing_drafts").insert({
+  const { data: created, error } = await admin.from("listing_drafts").insert({
     market_id: market.id,
     token_hash: hashDraftToken(token),
     full_name: values.full_name,
@@ -101,12 +104,13 @@ export async function startDraft(_prev: ContactFormState, formData: FormData): P
     phone,
     source,
     ip_hash: ipHash,
-  });
-  if (error) {
-    console.error("draft insert failed", error.code, error.message);
+  }).select("id").single();
+  if (error || !created) {
+    console.error("draft insert failed", error?.code, error?.message);
     return { status: "error", message: "We couldn't save your details. Please try again.", values };
   }
   await setDraftCookie(token);
+  await logFunnelEvent(market.id, "contact_saved", source, created.id);
 
   // The course starts when someone gives their email, not when they verify it.
   await enrollInCourse(market, values.email, "/sell draft");
@@ -239,7 +243,10 @@ export async function submitDraft(_prev: DraftSubmitState, formData: FormData): 
     return { status: "error", message: "We couldn't submit your listing. Please try again.", values, submittedAt: Date.now() };
   }
 
-  await track("submitted", { source: draft.source ?? "direct", verified: false }, { headers: await headers() }).catch(() => {});
+  await Promise.all([
+    track("submitted", { source: draft.source ?? "direct", verified: false }, { headers: await headers() }).catch(() => {}),
+    logFunnelEvent(market.id, "submitted", draft.source, draft.id),
+  ]);
   try {
     if (await allowSignInEmail(updated.email)) await sendDraftVerification(market, updated);
   } catch (e) {

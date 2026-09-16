@@ -217,6 +217,15 @@ type ListingDraftRow = {
   updated_at: string;
 };
 
+type FunnelEventRow = {
+  id: number;
+  market_id: string;
+  event: "form_start" | "contact_saved" | "address_done" | "photos_done" | "submitted" | "email_verified";
+  source: string;
+  draft_id: string | null;
+  created_at: string;
+};
+
 type AreaWaitlistRow = {
   id: string;
   email: string;
@@ -309,6 +318,12 @@ export type Database = {
         Relationships: [
           { foreignKeyName: "course_emails_signup_id_fkey"; columns: ["signup_id"]; isOneToOne: false; referencedRelation: "course_signups"; referencedColumns: ["id"] },
         ];
+      };
+      funnel_events: {
+        Row: FunnelEventRow;
+        Insert: Pick<FunnelEventRow, "market_id" | "event"> & Partial<Omit<FunnelEventRow, "id">>;
+        Update: Partial<FunnelEventRow>;
+        Relationships: [];
       };
       listing_drafts: {
         Row: ListingDraftRow;

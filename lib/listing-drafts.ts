@@ -6,6 +6,7 @@ import type { ListingDraft, ListingDraftStep } from "@/lib/database.types";
 import { sendEmail, sendEmailWithId, siteLink, type Unsubscribe } from "@/lib/email";
 import { listingPhotoPrefix, toInt, type ListingFormValues } from "@/lib/listing-form";
 import { sendAdminNewListing, sendListingReceived } from "@/lib/listing-emails";
+import { LISTING_PHOTO_MAX } from "@/lib/listings";
 import { brandName, type Market } from "@/lib/markets";
 import { createSignInLink } from "@/lib/sign-in";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -18,13 +19,15 @@ import { createAdminClient } from "@/lib/supabase/admin";
  */
 
 export const DRAFT_COOKIE = "nb_listing_draft";
-export const DRAFT_PHOTO_MAX = 15;
+export const DRAFT_PHOTO_MAX = LISTING_PHOTO_MAX;
 /** "Write it for me" runs per draft. */
 export const DRAFT_AI_LIMIT = 3;
-/** New drafts per email, and per IP, in 24 hours. */
-export const DRAFT_DAILY_LIMIT = 3;
-/** Signed upload URLs per draft: the photo limit three times over, for retries and swaps. */
-export const DRAFT_UPLOAD_LIMIT = DRAFT_PHOTO_MAX * 3;
+/** New drafts per email in 24 hours. */
+export const DRAFT_EMAIL_DAILY_LIMIT = 3;
+/** New drafts per IP in 24 hours. Higher than per email: mobile carriers put many people behind one address. */
+export const DRAFT_IP_DAILY_LIMIT = 20;
+/** Signed upload URLs per draft: the photo limit plus room for retries and swaps. */
+export const DRAFT_UPLOAD_LIMIT = 75;
 export const DRAFT_RETENTION_DAYS = 14;
 const REMINDER_AFTER_MS = 24 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;

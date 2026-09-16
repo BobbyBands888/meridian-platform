@@ -1,7 +1,7 @@
 import type { ListingStatus } from "@/lib/database.types";
 import { areaForZip, locationLine, type AreaMarket } from "@/lib/areas";
 
-export const LISTING_PHOTO_MAX = 20;
+export const LISTING_PHOTO_MAX = 50;
 export const DESCRIPTION_MIN = 50;
 export const DESCRIPTION_MAX = 5000;
 

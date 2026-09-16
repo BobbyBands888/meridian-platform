@@ -25,6 +25,7 @@ const TABS = [
   { key: "vendors", label: "Pending Vendors" },
   { key: "listings", label: "Pending Listings" },
   { key: "drafts", label: "Drafts" },
+  { key: "funnel", label: "Funnel" },
   { key: "leads", label: "All Leads" },
   { key: "buyers", label: "Buyers" },
   { key: "markets", label: "Markets" },
@@ -98,6 +99,7 @@ export default async function AdminPage({ params: routeParams, searchParams }: P
     vendors: (vendorsCount.count ?? 0) + (editsCount.count ?? 0),
     listings: listingsCount.count ?? 0,
     drafts: draftsCount.count ?? 0,
+    funnel: 0,
     leads: leadsCount.count ?? 0,
     buyers: (buyersCount.count ?? 0) + (alertsTotal.count ?? 0),
     markets: markets.length,
@@ -170,6 +172,7 @@ export default async function AdminPage({ params: routeParams, searchParams }: P
         {tab === "vendors" && <PendingVendors scope={scope} marketsById={marketsById} />}
         {tab === "listings" && <PendingListings scope={scope} marketsById={marketsById} />}
         {tab === "drafts" && <Drafts scope={scope} marketsById={marketsById} />}
+        {tab === "funnel" && <Funnel scope={scope} source={typeof params.source === "string" ? params.source : ""} />}
         {tab === "leads" && <AllLeads scope={scope} marketsById={marketsById} page={page} type={leadType} />}
         {tab === "buyers" && <Buyers scope={scope} marketsById={marketsById} />}
         {tab === "markets" && <Markets markets={markets} returnTo={withScope(scope, "/admin?tab=markets")} />}
@@ -335,6 +338,88 @@ async function PendingListings({ scope, marketsById }: TabProps) {
         );
       })}
     </ul>
+  );
+}
+
+const FUNNEL_STEPS = [
+  { event: "form_start", label: "Started the form" },
+  { event: "contact_saved", label: "Saved contact details" },
+  { event: "address_done", label: "Entered an address" },
+  { event: "photos_done", label: "Added photos" },
+  { event: "submitted", label: "Submitted" },
+  { event: "email_verified", label: "Confirmed email" },
+] as const;
+
+/** Rows read for the Funnel tab: plenty for 30 days at current volume, and a ceiling on page cost. */
+const FUNNEL_ROW_CAP = 50_000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const daysBefore = (days: number) => new Date(Date.now() - days * DAY_MS);
+
+/** Seller listing funnel from funnel_events: how many sellers reached each step in the last 7 and 30 days. */
+async function Funnel({ scope, source }: { scope: Scope; source: string }) {
+  const since = daysBefore(30);
+  let query = createAdminClient()
+    .from("funnel_events")
+    .select("event, source, created_at")
+    .gte("created_at", since.toISOString())
+    .order("created_at", { ascending: false })
+    .limit(FUNNEL_ROW_CAP);
+  if (scope.market) query = query.eq("market_id", scope.market.id);
+  const { data, error } = await query;
+  if (error) return <EmptyState title="The funnel couldn't be loaded">{error.message}</EmptyState>;
+
+  const rows = data ?? [];
+  const sources = [...new Set(rows.map((r) => r.source))].sort();
+  const filtered = source ? rows.filter((r) => r.source === source) : rows;
+  const weekAgo = since.getTime() + 23 * DAY_MS;
+  const count = (event: string, days: 7 | 30) => filtered.filter((r) => r.event === event && (days === 30 || Date.parse(r.created_at) >= weekAgo)).length;
+  const pct = (n: number, of: number) => (of > 0 ? `${Math.round((n / of) * 100)}%` : "—");
+  const link = (value: string) => withScope(scope, `/admin?tab=funnel${value ? `&source=${encodeURIComponent(value)}` : ""}`);
+
+  return (
+    <div className="space-y-6">
+      <nav aria-label="Source filter" className="flex flex-wrap items-center gap-2 text-[14px]">
+        <span className="mr-1 text-muted">Source</span>
+        {["", ...sources].map((value) => (
+          <Link
+            key={value || "all"}
+            href={link(value)}
+            aria-current={source === value ? "page" : undefined}
+            className={`rounded-full border px-3 py-1 ${source === value ? "border-forest bg-forest text-white" : "border-line hover:border-forest"}`}
+          >
+            {value || "All sources"}
+          </Link>
+        ))}
+      </nav>
+      <div className="overflow-x-auto rounded-2xl border border-line">
+        <table className="w-full min-w-[520px] text-left text-[14px]">
+          <thead className="bg-surface text-[13px] text-muted">
+            <tr>
+              <th className="px-4 py-3 font-medium">Step</th>
+              <th className="px-4 py-3 text-right font-medium">Last 7 days</th>
+              <th className="px-4 py-3 text-right font-medium">Last 30 days</th>
+              <th className="px-4 py-3 text-right font-medium">Of starts (30 days)</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-line">
+            {FUNNEL_STEPS.map((step) => (
+              <tr key={step.event}>
+                <td className="px-4 py-3">
+                  {step.label} <span className="text-[13px] text-muted">({step.event})</span>
+                </td>
+                <td className="px-4 py-3 text-right tabular-nums">{count(step.event, 7).toLocaleString("en-US")}</td>
+                <td className="px-4 py-3 text-right tabular-nums">{count(step.event, 30).toLocaleString("en-US")}</td>
+                <td className="px-4 py-3 text-right tabular-nums">{pct(count(step.event, 30), count("form_start", 30))}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="text-[13px] text-muted">
+        Counts events, not unique people. Steps after a draft exists count once per draft; &ldquo;Started the form&rdquo; counts once per page visit.
+        {rows.length >= FUNNEL_ROW_CAP ? ` Only the latest ${FUNNEL_ROW_CAP.toLocaleString("en-US")} events are counted.` : ""}
+      </p>
+    </div>
   );
 }
 

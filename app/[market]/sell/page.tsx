@@ -50,7 +50,6 @@ export default async function SellPage({ params, searchParams }: PageProps<"/[ma
   const draft = user ? null : await getCookieDraft(market);
   const sParam = typeof query.s === "string" && /^[a-z0-9_-]{1,60}$/i.test(query.s) ? query.s.toLowerCase() : null;
   const source = draft?.source ?? sParam;
-  const photoLimit = user ? LISTING_PHOTO_MAX : DRAFT_PHOTO_MAX;
   const directory = zipDirectory(market);
 
   return (
@@ -67,7 +66,7 @@ export default async function SellPage({ params, searchParams }: PageProps<"/[ma
           </p>
         )}
         <ul className="mt-6 grid gap-2 sm:grid-cols-2">
-          {[...points, `Up to ${photoLimit} photos`].map((p) => (
+          {[...points, `Up to ${LISTING_PHOTO_MAX} photos`].map((p) => (
             <li key={p}>
               <Check label={p} />
             </li>
