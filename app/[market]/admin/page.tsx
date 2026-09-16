@@ -23,6 +23,7 @@ export const metadata: Metadata = {
 
 const TABS = [
   { key: "vendors", label: "Pending Vendors" },
+  { key: "all-vendors", label: "All Vendors" },
   { key: "listings", label: "Pending Listings" },
   { key: "drafts", label: "Drafts" },
   { key: "funnel", label: "Funnel" },
@@ -33,6 +34,9 @@ const TABS = [
 type Tab = (typeof TABS)[number]["key"];
 
 const LEADS_PAGE_SIZE = 50;
+const VENDORS_PAGE_SIZE = 50;
+const VENDOR_STATUSES = ["pending", "approved", "rejected"] as const;
+type VendorStatusFilter = (typeof VENDOR_STATUSES)[number];
 /** The Buyers tab shows the most recent of each list; the CSV exports hold everything. */
 const BUYERS_PREVIEW = 50;
 
@@ -83,7 +87,7 @@ export default async function AdminPage({ params: routeParams, searchParams }: P
   const notice = notices[String(params.done ?? "")];
 
   const admin = createAdminClient();
-  const [vendorsCount, editsCount, listingsCount, leadsCount, alertsActive, alertsTotal, buyersCount, draftsCount] = await Promise.all([
+  const [vendorsCount, editsCount, listingsCount, leadsCount, alertsActive, alertsTotal, buyersCount, draftsCount, allVendorsCount] = await Promise.all([
     scoped(admin.from("vendors").select("id", { count: "exact", head: true }).eq("status", "pending")),
     scoped(admin.from("vendor_pending_edits").select("vendor_id, vendors!inner(market_id)", { count: "exact", head: true }), "vendors.market_id"),
     scoped(admin.from("listings").select("id", { count: "exact", head: true }).eq("status", "pending")),
@@ -92,11 +96,13 @@ export default async function AdminPage({ params: routeParams, searchParams }: P
     scoped(admin.from("listing_alerts").select("id", { count: "exact", head: true })),
     scoped(admin.from("profiles").select("id", { count: "exact", head: true }).contains("roles", ["buyer"])),
     scoped(admin.from("listing_drafts").select("id", { count: "exact", head: true }).neq("status", "verified")),
+    scoped(admin.from("vendors").select("id", { count: "exact", head: true })),
   ]);
   const alertSubscribers = alertsActive.count ?? 0;
   const alertUnsubscribed = (alertsTotal.count ?? 0) - alertSubscribers;
   const counts: Record<Tab, number> = {
     vendors: (vendorsCount.count ?? 0) + (editsCount.count ?? 0),
+    "all-vendors": allVendorsCount.count ?? 0,
     listings: listingsCount.count ?? 0,
     drafts: draftsCount.count ?? 0,
     funnel: 0,
@@ -170,6 +176,15 @@ export default async function AdminPage({ params: routeParams, searchParams }: P
 
       <div className="mt-8">
         {tab === "vendors" && <PendingVendors scope={scope} marketsById={marketsById} />}
+        {tab === "all-vendors" && (
+          <AllVendors
+            scope={scope}
+            marketsById={marketsById}
+            page={page}
+            query={typeof params.q === "string" ? params.q.trim().slice(0, 100) : ""}
+            status={VENDOR_STATUSES.find((s) => s === params.status)}
+          />
+        )}
         {tab === "listings" && <PendingListings scope={scope} marketsById={marketsById} />}
         {tab === "drafts" && <Drafts scope={scope} marketsById={marketsById} />}
         {tab === "funnel" && <Funnel scope={scope} source={typeof params.source === "string" ? params.source : ""} />}
@@ -493,6 +508,148 @@ async function Drafts({ scope, marketsById }: TabProps) {
           })}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+const statusStyles: Record<VendorStatusFilter, string> = {
+  pending: "bg-warm/15 text-ink",
+  approved: "bg-forest/10 text-forest",
+  rejected: "bg-red-50 text-red-800",
+};
+
+/** Every vendor in the market filter, newest first, with search by business name and a status filter. */
+async function AllVendors({ scope, marketsById, page, query, status }: TabProps & { page: number; query: string; status?: VendorStatusFilter }) {
+  let request = createAdminClient()
+    .from("vendors")
+    .select("id, business_name, category, status, created_at, market_id, vendor_verifications(verified_at)", { count: "exact" })
+    .order("created_at", { ascending: false })
+    .range((page - 1) * VENDORS_PAGE_SIZE, page * VENDORS_PAGE_SIZE - 1);
+  if (scope.market) request = request.eq("market_id", scope.market.id);
+  if (status) request = request.eq("status", status);
+  // Partial, case-insensitive match; % and _ typed in the box are matched literally.
+  if (query) request = request.ilike("business_name", `%${query.replace(/[\\%_]/g, (c) => `\\${c}`)}%`);
+  const { data, count, error } = await request;
+  if (error) return <EmptyState title="Vendors couldn't be loaded">{error.message}</EmptyState>;
+
+  const vendors = data ?? [];
+  const total = count ?? 0;
+  const pages = Math.max(1, Math.ceil(total / VENDORS_PAGE_SIZE));
+  const href = ({ p = 1, s = status, q = query }: { p?: number; s?: VendorStatusFilter; q?: string }) =>
+    withScope(scope, `/admin?tab=all-vendors${s ? `&status=${s}` : ""}${q ? `&q=${encodeURIComponent(q)}` : ""}${p > 1 ? `&page=${p}` : ""}`);
+  const verifiedAt = (v: (typeof vendors)[number]) => {
+    const rel = v.vendor_verifications as { verified_at: string | null } | { verified_at: string | null }[] | null;
+    return (Array.isArray(rel) ? rel[0] : rel)?.verified_at ?? null;
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <form action="/admin" method="get" role="search" className="flex w-full max-w-md gap-2">
+          <input type="hidden" name="tab" value="all-vendors" />
+          <input type="hidden" name="market" value={scope.param} />
+          {status && <input type="hidden" name="status" value={status} />}
+          <label htmlFor="vendor-search" className="sr-only">
+            Search by business name
+          </label>
+          <input
+            id="vendor-search"
+            name="q"
+            type="search"
+            defaultValue={query}
+            placeholder="Search by business name"
+            maxLength={100}
+            className="min-h-11 w-full rounded-lg border border-ink/20 px-3 text-[15px] focus:border-forest focus:outline-none"
+          />
+          <button type="submit" className="min-h-11 shrink-0 rounded-lg border border-ink/20 px-4 text-[15px] font-medium hover:border-forest">
+            Search
+          </button>
+        </form>
+        <nav aria-label="Status filter" className="flex flex-wrap items-center gap-2 text-[14px]">
+          {[undefined, ...VENDOR_STATUSES].map((s) => (
+            <Link
+              key={s ?? "all"}
+              href={href({ s })}
+              aria-current={status === s ? "page" : undefined}
+              className={`rounded-full border px-3 py-1 capitalize ${status === s ? "border-forest bg-forest text-white" : "border-line hover:border-forest"}`}
+            >
+              {s ?? "All"}
+            </Link>
+          ))}
+        </nav>
+      </div>
+      <p className="text-[14px] text-muted">
+        {total.toLocaleString("en-US")} {total === 1 ? "vendor" : "vendors"}
+        {query ? ` matching “${query}”` : ""}
+        {query && (
+          <>
+            {" · "}
+            <Link href={href({ q: "" })} className="font-medium text-forest underline underline-offset-2">
+              Clear search
+            </Link>
+          </>
+        )}
+      </p>
+
+      {vendors.length === 0 ? (
+        <EmptyState title={query || status ? "No vendors match" : "No vendors yet"} />
+      ) : (
+        <div className="overflow-x-auto rounded-2xl border border-line">
+          <table className="w-full min-w-[680px] text-left text-[14px]">
+            <thead className="bg-surface text-[13px] text-muted">
+              <tr>
+                <th className="px-4 py-3 font-medium">Business</th>
+                <th className="px-4 py-3 font-medium">Category</th>
+                <th className="px-4 py-3 font-medium">Status</th>
+                <th className="px-4 py-3 font-medium">Verified</th>
+                <th className="px-4 py-3 font-medium">Created</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-line">
+              {vendors.map((v) => (
+                <tr key={v.id}>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Link href={`/admin/vendors/${v.id}`} className="font-semibold text-forest hover:underline">
+                        {v.business_name}
+                      </Link>
+                      <MarketBadge market={marketsById.get(v.market_id)} />
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">{categoryByValue(v.category).singular}</td>
+                  <td className="px-4 py-3">
+                    <span className={`rounded-full px-2 py-0.5 text-[13px] font-medium capitalize ${statusStyles[v.status]}`}>{v.status}</span>
+                  </td>
+                  <td className="px-4 py-3">{verifiedAt(v) ? "Yes" : "No"}</td>
+                  <td className="whitespace-nowrap px-4 py-3">{dateFmt.format(new Date(v.created_at))}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {pages > 1 && (
+        <nav aria-label="Vendor pages" className="flex items-center justify-between text-[15px]">
+          {page > 1 ? (
+            <Link href={href({ p: page - 1 })} className="font-medium text-forest underline underline-offset-2">
+              ← Newer
+            </Link>
+          ) : (
+            <span />
+          )}
+          <span className="text-muted">
+            Page {page} of {pages}
+          </span>
+          {page < pages ? (
+            <Link href={href({ p: page + 1 })} className="font-medium text-forest underline underline-offset-2">
+              Older →
+            </Link>
+          ) : (
+            <span />
+          )}
+        </nav>
+      )}
     </div>
   );
 }

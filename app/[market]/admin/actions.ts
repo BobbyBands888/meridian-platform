@@ -7,11 +7,11 @@ import { sendNewListingAlerts } from "@/lib/automation/buyer-alerts";
 import { postListingToFacebook } from "@/lib/automation/facebook";
 import { getCurrentProfile } from "@/lib/auth";
 import { getMarketById } from "@/lib/market-data";
-import type { MarketStatus } from "@/lib/markets";
+import { isLive, type MarketStatus } from "@/lib/markets";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CACHE_TAGS } from "@/lib/supabase/public";
 import { sendListingApproved, sendListingRejected } from "@/lib/listing-emails";
-import { sendVendorApproved, sendVendorEditApproved, sendVendorEditDeclined, sendVendorRejected, sendVendorVerified } from "@/lib/vendor-emails";
+import { sendVendorApproved, sendVendorEditApproved, sendVendorEditDeclined, sendVendorRejected, sendVendorRemoved, sendVendorVerified } from "@/lib/vendor-emails";
 
 async function assertAdmin() {
   const profile = await getCurrentProfile();
@@ -66,7 +66,7 @@ export async function approveVendor(formData: FormData) {
   if (error) throw new Error(error.message);
   await sendVendorApproved(market, vendor.profiles.email, vendor);
   refreshVendors();
-  finish(formData, `/admin/vendors/${vendorId}`, "approved");
+  finish(formData, `/admin/vendors/${vendorId}`, isLive(market) ? "approved" : "approved-prelaunch");
 }
 
 export async function rejectVendor(formData: FormData) {
@@ -74,12 +74,19 @@ export async function rejectVendor(formData: FormData) {
   const vendorId = String(formData.get("vendor_id"));
   const { admin, vendor, market } = await loadVendor(vendorId);
   if (vendor.status === "rejected") finish(formData, `/admin/vendors/${vendorId}`, "already");
+  const wasListed = vendor.status === "approved";
   const { error } = await admin.from("vendors").update({ status: "rejected" }).eq("id", vendorId);
   if (error) throw new Error(error.message);
+  // A pending profile edit is discarded without its own "edit declined" email; the one email below covers it.
   await admin.from("vendor_pending_edits").delete().eq("vendor_id", vendorId);
-  await sendVendorRejected(market, vendor.profiles.email, vendor, note(formData));
-  if (vendor.status === "approved") refreshVendors();
-  finish(formData, `/admin/vendors/${vendorId}`, "rejected");
+  if (wasListed) {
+    // Taking a live vendor out of the directory reads differently from turning down an application.
+    await sendVendorRemoved(market, vendor.profiles.email, vendor, note(formData));
+    refreshVendors();
+  } else {
+    await sendVendorRejected(market, vendor.profiles.email, vendor, note(formData));
+  }
+  finish(formData, `/admin/vendors/${vendorId}`, wasListed ? (isLive(market) ? "removed" : "removed-prelaunch") : "rejected");
 }
 
 export async function approveVendorEdit(formData: FormData) {
@@ -170,9 +177,12 @@ export async function saveVerification(formData: FormData) {
 
   const badgeChanged = (current?.verified_at ?? null) !== verifiedAt;
   if (badgeChanged) refreshVendors();
-  if (markVerified && badgeChanged && vendor.status === "approved") await sendVendorVerified(market, vendor.profiles.email, vendor, verifiedAt!);
+  // Only approved vendors get the "You're verified" email, and the badge is only public in a live market.
+  const emailed = markVerified && badgeChanged && vendor.status === "approved";
+  if (emailed) await sendVendorVerified(market, vendor.profiles.email, vendor, verifiedAt!);
 
-  finish(formData, `/admin/vendors/${vendorId}#verification`, markVerified ? (badgeChanged ? "verified" : "verification-saved") : current?.verified_at ? "unverified" : "verification-saved");
+  const verifiedNotice = !emailed ? "verified-no-email" : isLive(market) ? "verified" : "verified-prelaunch";
+  finish(formData, `/admin/vendors/${vendorId}#verification`, markVerified ? (badgeChanged ? verifiedNotice : "verification-saved") : current?.verified_at ? "unverified" : "verification-saved");
 }
 
 /** Launches a market (coming_soon to live) or takes it back to coming soon. */

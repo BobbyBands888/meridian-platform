@@ -83,7 +83,7 @@ export function sendVendorApproved(market: Market, to: string, vendor: VendorInf
       subject: `You're approved for the ${brand} launch`,
       heading: `You're approved for the ${brand} launch`,
       blocks: [
-        { kind: "p", text: `${vendor.business_name} is approved and will be listed under ${categoryByValue(vendor.category).label} as soon as ${brand} launches. You don't need to do anything else. We'll let you know when you're live.` },
+        { kind: "p", text: `${vendor.business_name} is approved. Your profile will go live when ${brand} launches, listed under ${categoryByValue(vendor.category).label}. You don't need to do anything else. We'll let you know when you're live.` },
         { kind: "p", text: foundingCopy(market) },
         { kind: "button", label: "View your vendor dashboard", href: siteLink(market, "/dashboard/vendor") },
       ],
@@ -120,6 +120,20 @@ export function sendAdminVerificationSubmitted(market: Market, vendor: { id: str
 }
 
 export function sendVendorVerified(market: Market, to: string, vendor: VendorInfo, verifiedAt: string) {
+  const brand = brandName(market);
+  if (!isLive(market)) {
+    return sendEmail({
+      market,
+      to,
+      subject: `You're verified for the ${brand} launch`,
+      heading: "You're verified",
+      blocks: [
+        { kind: "p", text: `We reviewed the license and insurance documents for ${vendor.business_name}. Your profile will go live when ${brand} launches, showing "${verifiedBadgeText(market, verifiedAt)}", and you'll be listed first in your category.` },
+        { kind: "p", text: "When your insurance renews, upload the new certificate from your vendor dashboard so we can review it again." },
+        { kind: "button", label: "View your vendor dashboard", href: siteLink(market, "/dashboard/vendor") },
+      ],
+    });
+  }
   return sendEmail({
     market,
     to,
@@ -144,6 +158,23 @@ export function sendVendorRejected(market: Market, to: string, vendor: VendorInf
       ...(note ? [{ kind: "quote" as const, text: note }] : []),
       { kind: "p", text: "You can update your profile and resubmit it from your vendor dashboard." },
       { kind: "button", label: "Update your profile", href: siteLink(market, "/dashboard/vendor/edit") },
+    ],
+  });
+}
+
+/** For a vendor who was live in the directory and has been taken out of it (not a rejected application). */
+export function sendVendorRemoved(market: Market, to: string, vendor: VendorInfo, note: string) {
+  const brand = brandName(market);
+  return sendEmail({
+    market,
+    to,
+    subject: `Your ${brand} profile has been removed from the directory`,
+    heading: "Your profile is no longer listed",
+    blocks: [
+      { kind: "p", text: `We've removed ${vendor.business_name} from the ${brand} vendor directory, so your profile no longer appears to buyers and sellers.` },
+      ...(note ? [{ kind: "quote" as const, text: note }] : []),
+      { kind: "p", text: "If you'd like to be listed again, update your profile from your vendor dashboard and we'll review it." },
+      { kind: "button", label: "Open your vendor dashboard", href: siteLink(market, "/dashboard/vendor/edit") },
     ],
   });
 }

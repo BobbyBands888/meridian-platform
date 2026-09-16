@@ -13,23 +13,30 @@ import { categoryByValue, vendorPath } from "@/lib/vendors";
 import { COI_BUCKET, formatReviewDate, licenseRequired, verifiedBadgeText } from "@/lib/verification";
 import { approveVendor, approveVendorEdit, declineVendorEdit, rejectVendor, saveVerification } from "../../actions";
 import { SubmitButton } from "@/components/submit-button";
+import { ConfirmForm } from "../../confirm-form";
 
 export const metadata: Metadata = {
   title: "Review vendor",
   robots: { index: false },
 };
 
-const done: Record<string, string> = {
+/** Result notices after an action, worded for the vendor's own market (brand is "Tampa Buys", say). */
+const doneNotices = (brand: string): Record<string, string> => ({
   approved: "Approved. The vendor was emailed and their profile is live.",
+  "approved-prelaunch": `Approved and the vendor was emailed. Their profile will go live when ${brand} launches.`,
   rejected: "Rejected. The vendor was emailed.",
+  removed: "Removed from the directory. Their public profile is down and the vendor was emailed.",
+  "removed-prelaunch": `Removed from the directory before launch, so they won't be listed when ${brand} launches. The vendor was emailed.`,
   "edit-approved": "Edit approved. The changes are live and the vendor was emailed.",
   "edit-declined": "Edit declined. The vendor was emailed and their current profile is unchanged.",
   already: "That was already handled, so no email was sent again.",
   verified: "Marked as verified. The badge is live and the vendor was emailed.",
+  "verified-prelaunch": `Marked as verified and the vendor was emailed. Their profile will go live with the badge when ${brand} launches.`,
+  "verified-no-email": "Marked as verified. No email was sent because the vendor isn't approved; the badge shows once they are.",
   unverified: "Verification removed. The badge is no longer shown.",
   "verification-saved": "Verification review saved.",
   "verify-incomplete": "Your review steps and notes were saved. Check all three steps to mark the vendor as verified.",
-};
+});
 
 const certLabels = {
   licensed: "Holds any license their field requires",
@@ -43,7 +50,6 @@ export default async function AdminVendorPage({ params, searchParams }: PageProp
   const { market: siteSlug, id } = await params;
   const siteMarket = await requireMarket(siteSlug);
   await requireAdmin(`/admin/vendors/${id}`);
-  const notice = done[String((await searchParams).done ?? "")];
 
   const admin = createAdminClient();
   const { data: vendor } = await admin
@@ -53,6 +59,7 @@ export default async function AdminVendorPage({ params, searchParams }: PageProp
     .maybeSingle();
   if (!vendor) notFound();
   const market = await getMarketById(vendor.market_id);
+  const notice = doneNotices(brandName(market))[String((await searchParams).done ?? "")];
   const publicHref = (path: string) => (market.id === siteMarket.id ? path : marketUrl(market, path));
 
   const { data: verification } = await admin.from("vendor_verifications").select("*").eq("vendor_id", vendor.id).maybeSingle();
@@ -66,9 +73,14 @@ export default async function AdminVendorPage({ params, searchParams }: PageProp
 
   return (
     <Container className="py-12 sm:py-16">
-      <Link href="/admin" className="text-[15px] font-medium text-forest hover:underline">
-        ← Admin
-      </Link>
+      <nav aria-label="Back" className="flex flex-wrap gap-x-4 gap-y-1 text-[15px] font-medium text-forest">
+        <Link href="/admin" className="hover:underline">
+          ← Admin
+        </Link>
+        <Link href={`/admin?tab=all-vendors&market=${market.slug}`} className="hover:underline">
+          All vendors
+        </Link>
+      </nav>
       <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-[15px] text-muted">
@@ -265,30 +277,43 @@ export default async function AdminVendorPage({ params, searchParams }: PageProp
           )}
         </section>
 
-        {vendor.status !== "approved" || !pending ? (
-          <section aria-labelledby="decision-heading" className="rounded-2xl border border-line p-6">
-            <h2 id="decision-heading" className="text-lg font-semibold">
-              Decision
-            </h2>
-            <div className="mt-4 space-y-5">
-              {vendor.status !== "approved" && (
-                <form action={approveVendor}>
-                  <input type="hidden" name="vendor_id" value={vendor.id} />
-                  <SubmitButton pendingLabel="Approving">Approve vendor</SubmitButton>
-                </form>
-              )}
-              {vendor.status !== "rejected" && (
-                <form action={rejectVendor} className="space-y-3">
-                  <input type="hidden" name="vendor_id" value={vendor.id} />
-                  <NoteField id="reject-note" />
-                  <SubmitButton variant="secondary" pendingLabel="Rejecting">
-                    {vendor.status === "approved" ? "Remove from directory" : "Reject vendor"}
-                  </SubmitButton>
-                </form>
-              )}
-            </div>
-          </section>
-        ) : null}
+        {/* Always shown: an approved vendor with a pending edit can still be removed (the edit is discarded). */}
+        <section aria-labelledby="decision-heading" className="rounded-2xl border border-line p-6">
+          <h2 id="decision-heading" className="text-lg font-semibold">
+            Decision
+          </h2>
+          <div className="mt-4 space-y-5">
+            {vendor.status !== "approved" && (
+              <form action={approveVendor}>
+                <input type="hidden" name="vendor_id" value={vendor.id} />
+                <SubmitButton pendingLabel="Approving">Approve vendor</SubmitButton>
+              </form>
+            )}
+            {vendor.status === "pending" && (
+              <form action={rejectVendor} className="space-y-3">
+                <input type="hidden" name="vendor_id" value={vendor.id} />
+                <NoteField id="reject-note" />
+                <SubmitButton variant="secondary" pendingLabel="Rejecting">
+                  Reject vendor
+                </SubmitButton>
+              </form>
+            )}
+            {vendor.status === "approved" && (
+              <ConfirmForm
+                action={rejectVendor}
+                message={`Remove ${vendor.business_name} from the directory? ${isLive(market) ? "Their public profile comes down right away" : "They won't be listed when the market launches"}, and they get an email${pending ? ". Their pending profile edit will be discarded" : ""}.`}
+                className="space-y-3"
+              >
+                <input type="hidden" name="vendor_id" value={vendor.id} />
+                <NoteField id="reject-note" />
+                <SubmitButton variant="secondary" pendingLabel="Removing">
+                  Remove from directory
+                </SubmitButton>
+                {pending && <p className="text-[13px] text-muted">Removing also discards the pending profile edit (no separate email).</p>}
+              </ConfirmForm>
+            )}
+          </div>
+        </section>
       </div>
     </Container>
   );
