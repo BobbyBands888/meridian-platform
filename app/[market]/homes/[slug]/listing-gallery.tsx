@@ -118,6 +118,7 @@ export function ListingGallery({ photos, alt }: { photos: Photo[]; alt: string }
                     loading={i === 0 ? "eager" : "lazy"}
                     fetchPriority={i === 0 ? "high" : "low"}
                     sizes="(min-width: 1152px) 1120px, 100vw"
+                    quality={85}
                     className="object-cover"
                   />
                 </button>
@@ -188,7 +189,7 @@ export function ListingGallery({ photos, alt }: { photos: Photo[]; alt: string }
             >
               {photos.map((photo, i) => (
                 <div key={photo.id} className="relative h-full w-full shrink-0 snap-center" aria-label={`${i + 1} of ${photos.length}`}>
-                  {seen.has(i) && <Image src={photo.url} alt={`${alt}, ${i + 1} of ${photos.length}`} fill sizes="100vw" className="object-contain" />}
+                  {seen.has(i) && <Image src={photo.url} alt={`${alt}, ${i + 1} of ${photos.length}`} fill sizes="100vw" quality={85} className="object-contain" />}
                 </div>
               ))}
             </div>

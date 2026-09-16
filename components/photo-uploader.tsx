@@ -50,9 +50,19 @@ type Props = {
 
 /** Photos in flight at once. Decoding is further limited by the worker pool in lib/photo-pool. */
 const CONCURRENCY = 4;
-/** Long edge after resizing, and JPEG qualities tried in order (about 80%, lower only if a photo is still too big). */
-const PHOTO_MAX_DIMENSION = 2000;
-const PHOTO_QUALITIES = [0.8, 0.72, 0.64, 0.56];
+/**
+ * The stored master for each listing photo: up to 3200px on the long edge, JPEG at about 90% (lower only if a photo is
+ * still over the size cap). Visitors never download the master directly; the image optimizer serves each screen a
+ * resized copy. JPEGs already within these limits (and not near-lossless) are uploaded without re-encoding.
+ */
+const PHOTO_OPTIONS = {
+  maxDimension: 3200,
+  qualities: [0.9, 0.86, 0.82, 0.78],
+  // Under the listing-photos bucket's 5 MB limit.
+  maxBytes: 4_500_000,
+  // About what a quality-95 export of a detailed photo takes; higher means a near-lossless file worth re-encoding.
+  passThroughMaxBytesPerPixel: 0.6,
+};
 
 /**
  * Uploads a file to Supabase Storage with XMLHttpRequest instead of fetch, which has no upload progress events. Sends
@@ -124,7 +134,7 @@ export function PhotoUploader({ userId, name, initialUrls = [], error, onBusyCha
       // Ask for the upload URL while the photo is being prepared; the two don't depend on each other.
       const targetRequest = uploadTargetUrl ? requestUploadTarget(uploadTargetUrl) : null;
       targetRequest?.catch(() => {}); // Handled below; don't let an early failure go unobserved.
-      const blob = await preparePhoto(file, { maxDimension: PHOTO_MAX_DIMENSION, maxBytes: 1_500_000, qualities: PHOTO_QUALITIES });
+      const blob = await preparePhoto(file, PHOTO_OPTIONS);
       const preview = URL.createObjectURL(blob);
       previews.current.add(preview);
       update(id, { status: "uploading", preview, progress: 0 });

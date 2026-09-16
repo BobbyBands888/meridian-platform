@@ -3,7 +3,7 @@
 import { prepareImage } from "@/lib/image";
 import type { PhotoJob, PhotoResult } from "@/lib/photo-worker";
 
-type Options = { maxDimension: number; maxBytes: number; qualities: number[] };
+type Options = Omit<PhotoJob, "id" | "file">;
 
 /**
  * Workers to run at once. HEIC decoding in WebAssembly is single-threaded per worker, so parallel workers are what

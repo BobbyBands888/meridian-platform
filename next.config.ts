@@ -13,6 +13,12 @@ const nextConfig: NextConfig = {
   images: {
     // Listing photos and vendor headshots are served from Supabase Storage public buckets.
     remotePatterns: [new URL("https://*.supabase.co/storage/v1/object/public/**")],
+    // 85 for the listing gallery (large, full-screen photos), the default 75 everywhere else.
+    qualities: [75, 85],
+    // Screen widths the optimizer resizes to. Listing photo masters are at most 3200px, so the largest step is 3200
+    // (a 3840 step would only store the same image again), and fewer steps means fewer transformations to pay for.
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2560, 3200],
+    // Cached copies live as long as the source's Cache-Control, which is a year for listing photos (immutable paths).
   },
 };
 
