@@ -33,7 +33,7 @@ export const COMPANY = {
   name: "Ownvista",
   domain: "getownvista.com",
   /** Postal address for the site footers and marketing emails (CAN-SPAM). */
-  mailingAddress: "Ownvista, PO Box 44, Medford, MA 02155",
+  mailingAddress: "Ownvista, PO Box 44, Medford, MA 02156",
 } as const;
 
 /** Hostnames (without www) that serve the Ownvista hub page instead of a market. */

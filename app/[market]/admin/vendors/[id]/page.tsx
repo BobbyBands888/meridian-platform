@@ -28,6 +28,7 @@ const doneNotices = (brand: string): Record<string, string> => ({
   removed: "Removed from the directory. Their public profile is down and the vendor was emailed.",
   "removed-prelaunch": `Removed from the directory before launch, so they won't be listed when ${brand} launches. The vendor was emailed.`,
   "edit-approved": "Edit approved. The changes are live and the vendor was emailed.",
+  "edit-approved-prelaunch": `Edit approved and the vendor was emailed. The changes will show when ${brand} launches.`,
   "edit-declined": "Edit declined. The vendor was emailed and their current profile is unchanged.",
   already: "That was already handled, so no email was sent again.",
   verified: "Marked as verified. The badge is live and the vendor was emailed.",

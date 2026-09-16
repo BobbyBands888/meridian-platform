@@ -5,6 +5,21 @@ export type SitemapEntry = {
   priority?: number;
 };
 
+/**
+ * Last-modified date for pages whose content is written in code (home, /sell, /vendors, /guides, area pages, the hub, ...).
+ * Bump it whenever that static page copy changes. Pages backed by records use the records' own dates instead.
+ */
+export const SITE_CONTENT_UPDATED_AT = "2026-09-16";
+
+/** SITE_CONTENT_UPDATED_AT as a Date. */
+export const siteContentDate = () => new Date(`${SITE_CONTENT_UPDATED_AT}T12:00:00Z`);
+
+/** The newest of some record dates, or the static content date when there are none. */
+export function latestDate(dates: (string | null | undefined)[]) {
+  const times = dates.map((d) => (d ? Date.parse(d) : NaN)).filter((t) => !Number.isNaN(t));
+  return times.length > 0 ? new Date(Math.max(...times)) : siteContentDate();
+}
+
 const escapeXml = (s: string) => s.replace(/[<>&'"]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", "'": "&apos;", '"': "&quot;" })[c]!);
 
 /** sitemaps.org XML for a list of absolute URLs. */
@@ -14,7 +29,7 @@ export function sitemapResponse(entries: SitemapEntry[], maxAge = 3600) {
       [
         "<url>",
         `<loc>${escapeXml(e.url)}</loc>`,
-        e.lastModified ? `<lastmod>${e.lastModified.toISOString()}</lastmod>` : "",
+        e.lastModified && !Number.isNaN(e.lastModified.getTime()) ? `<lastmod>${e.lastModified.toISOString()}</lastmod>` : "",
         e.changeFrequency ? `<changefreq>${e.changeFrequency}</changefreq>` : "",
         e.priority !== undefined ? `<priority>${e.priority}</priority>` : "",
         "</url>",

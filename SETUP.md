@@ -191,7 +191,7 @@ The guide with `topic: disclosure` is linked from the listing form, listing page
 
 ## Mailing address
 
-Every market's site footer, the hub footer, and every email footer show `Ownvista, PO Box 44, Medford, MA 02155`. It's set once as `COMPANY.mailingAddress` in `lib/markets.ts`. Marketing emails (buyer alerts and digests, the alert signup confirmation, and vendor tips and summaries) also get an unsubscribe link and one-click unsubscribe headers: pass `unsubscribe` to `sendEmail`.
+Every market's site footer, the hub footer, and every email footer show `Ownvista, PO Box 44, Medford, MA 02156`. It's set once as `COMPANY.mailingAddress` in `lib/markets.ts`. Marketing emails (buyer alerts and digests, the alert signup confirmation, and vendor tips and summaries) also get an unsubscribe link and one-click unsubscribe headers: pass `unsubscribe` to `sendEmail`.
 
 ## Checklist
 

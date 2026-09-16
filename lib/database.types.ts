@@ -50,6 +50,7 @@ type VendorRow = {
   lifecycle_unsubscribed_at: string | null;
   email_token: string;
   created_at: string;
+  updated_at: string;
 };
 
 type ListingRow = {
@@ -360,8 +361,8 @@ export type Database = {
       };
       vendors: {
         Row: VendorRow;
-        Insert: Omit<VendorRow, "id" | "status" | "founding_vendor" | "created_at" | "website" | "market_id" | "approved_at" | "lifecycle_unsubscribed_at" | "email_token"> &
-          Partial<Pick<VendorRow, "id" | "status" | "founding_vendor" | "created_at" | "website" | "market_id" | "approved_at" | "lifecycle_unsubscribed_at" | "email_token">>;
+        Insert: Omit<VendorRow, "id" | "status" | "founding_vendor" | "created_at" | "website" | "market_id" | "approved_at" | "lifecycle_unsubscribed_at" | "email_token" | "updated_at"> &
+          Partial<Pick<VendorRow, "id" | "status" | "founding_vendor" | "created_at" | "website" | "market_id" | "approved_at" | "lifecycle_unsubscribed_at" | "email_token" | "updated_at">>;
         Update: Partial<VendorRow>;
         Relationships: [
           { foreignKeyName: "vendors_profile_id_fkey"; columns: ["profile_id"]; isOneToOne: true; referencedRelation: "profiles"; referencedColumns: ["id"] },

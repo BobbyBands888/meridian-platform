@@ -40,15 +40,17 @@ type VendorStatusFilter = (typeof VENDOR_STATUSES)[number];
 /** The Buyers tab shows the most recent of each list; the CSV exports hold everything. */
 const BUYERS_PREVIEW = 50;
 
-const notices: Record<string, string> = {
+/** Result notices after an action; `brand` is the market the action was about ("Tampa Buys", say). */
+const notices = (brand: string): Record<string, string> => ({
   approved: "Approved, and the email was sent.",
   rejected: "Rejected, and the email was sent.",
   "edit-approved": "Edit approved. The changes are live and the vendor was emailed.",
+  "edit-approved-prelaunch": `Edit approved and the vendor was emailed. The changes will show when ${brand} launches.`,
   already: "That was already handled, so no email was sent again.",
   "market-live": "The market is live. Its listings, directory, and guides are now public.",
   "market-coming-soon": "The market is back to coming soon. Its listings and directory are hidden.",
   "confirm-required": "Check the confirmation box to change a market's status.",
-};
+});
 
 /** The market filter: one market's rows, or every market's. Defaults to the site the admin is on. */
 type Scope = { market: Market | null; param: string };
@@ -84,7 +86,8 @@ export default async function AdminPage({ params: routeParams, searchParams }: P
   const tab: Tab = TABS.some((t) => t.key === params.tab) ? (params.tab as Tab) : "vendors";
   const page = Math.max(1, Number(params.page) || 1);
   const leadType = params.type === "vendor" || params.type === "listing" || params.type === "interest" ? params.type : undefined;
-  const notice = notices[String(params.done ?? "")];
+  const doneMarket = markets.find((m) => m.slug === params.done_market);
+  const notice = notices(doneMarket ? brandName(doneMarket) : "the market")[String(params.done ?? "")];
 
   const admin = createAdminClient();
   const [vendorsCount, editsCount, listingsCount, leadsCount, alertsActive, alertsTotal, buyersCount, draftsCount, allVendorsCount] = await Promise.all([

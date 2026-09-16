@@ -19,11 +19,13 @@ async function assertAdmin() {
 }
 
 /** Sends the admin back where the action started (a tab or a detail page) with a result notice. */
-function finish(formData: FormData, fallback: string, done: string): never {
+function finish(formData: FormData, fallback: string, done: string, doneMarket?: string): never {
   const back = String(formData.get("return_to") ?? "");
   const base = back.startsWith("/admin") && !back.startsWith("//") ? back : fallback;
   const url = new URL(base, "http://admin.local");
   url.searchParams.set("done", done);
+  // The market the notice is about, so it can name the brand (the admin's own market filter may differ).
+  if (doneMarket) url.searchParams.set("done_market", doneMarket);
   redirect(`${url.pathname}${url.search}`);
 }
 
@@ -98,7 +100,7 @@ export async function approveVendorEdit(formData: FormData) {
   if (!applied) finish(formData, `/admin/vendors/${vendorId}`, "already");
   await sendVendorEditApproved(market, vendor.profiles.email, vendor);
   refreshVendors();
-  finish(formData, `/admin/vendors/${vendorId}`, "edit-approved");
+  finish(formData, `/admin/vendors/${vendorId}`, isLive(market) ? "edit-approved" : "edit-approved-prelaunch", market.slug);
 }
 
 export async function declineVendorEdit(formData: FormData) {
