@@ -11,7 +11,6 @@ import {
   DRAFT_EMAIL_DAILY_LIMIT,
   DRAFT_IP_DAILY_LIMIT,
   DRAFT_PHOTO_MAX,
-  DRAFT_UPLOAD_LIMIT,
   draftPhotoFolder,
   getCookieDraft,
   hashDraftToken,
@@ -156,45 +155,6 @@ export async function saveDraft(formData: FormData): Promise<DraftSaveResult> {
     return { ok: false };
   }
   return { ok: true, step };
-}
-
-export type UploadTarget = { path: string; token: string; publicUrl: string } | { error: string };
-
-/** A signed upload URL for one photo in the draft's folder. Counts toward the draft's upload ceiling. */
-export async function draftPhotoUploadTarget(): Promise<UploadTarget> {
-  const market = await getRequestMarket();
-  const draft = await getCookieDraft(market);
-  if (!draft || draft.status !== "draft") return { error: "Your draft expired. Reload the page." };
-
-  // Compare-and-set on the counter; the uploader sends a few photos at once, so retry when another request won.
-  const admin = createAdminClient();
-  let claimed = false;
-  let uploads = draft.photo_uploads;
-  for (let attempt = 0; attempt < 8 && !claimed; attempt++) {
-    if (uploads >= DRAFT_UPLOAD_LIMIT) return { error: "You've reached the upload limit for this draft." };
-    const { data } = await admin
-      .from("listing_drafts")
-      .update({ photo_uploads: uploads + 1 })
-      .eq("id", draft.id)
-      .eq("photo_uploads", uploads)
-      .select("id");
-    claimed = Boolean(data?.length);
-    if (!claimed) {
-      const { data: current } = await admin.from("listing_drafts").select("photo_uploads").eq("id", draft.id).maybeSingle();
-      if (!current) return { error: "Your draft expired. Reload the page." };
-      uploads = current.photo_uploads;
-    }
-  }
-  if (!claimed) return { error: "Upload failed. Remove it and try again." };
-
-  const path = `${draftPhotoFolder(draft.id)}/${crypto.randomUUID()}.jpg`;
-  const bucket = admin.storage.from("listing-photos");
-  const { data, error } = await bucket.createSignedUploadUrl(path);
-  if (error || !data) {
-    console.error("draft upload url failed", error?.message);
-    return { error: "Upload failed. Remove it and try again." };
-  }
-  return { path: data.path, token: data.token, publicUrl: bucket.getPublicUrl(data.path).data.publicUrl };
 }
 
 export type DraftSubmitState = ListingFormState & { submitted?: boolean };

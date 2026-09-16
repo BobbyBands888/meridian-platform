@@ -13,7 +13,7 @@ import { LISTING_PHOTO_MAX } from "@/lib/listings";
 import { brandName, countyList, serviceArea, type Market } from "@/lib/markets";
 import { createListing } from "./actions";
 import { ContactStep } from "./contact-step";
-import { draftPhotoUploadTarget, forgetDraft, saveDraft, submitDraft } from "./draft-actions";
+import { forgetDraft, saveDraft, submitDraft } from "./draft-actions";
 import { DraftSubmitted } from "./draft-submitted";
 import { ListingForm } from "./listing-form";
 
@@ -111,7 +111,7 @@ export default async function SellPage({ params, searchParams }: PageProps<"/[ma
                   step: draft.step,
                   photoMax: DRAFT_PHOTO_MAX,
                   save: saveDraft,
-                  getUploadTarget: draftPhotoUploadTarget,
+                  uploadTargetUrl: "/sell/photo-upload-target",
                   startOver: forgetDraft,
                 }}
                 zipDirectory={directory}

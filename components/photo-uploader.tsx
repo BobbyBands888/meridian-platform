@@ -15,7 +15,7 @@ import { CSS } from "@dnd-kit/utilities";
 import Image from "next/image";
 import { useEffect, useId, useRef, useState } from "react";
 import { Spinner } from "@/components/ui";
-import { prepareImage } from "@/lib/image";
+import { preparePhoto } from "@/lib/photo-pool";
 import { LISTING_PHOTO_MAX } from "@/lib/listings";
 import { createClient } from "@/lib/supabase/client";
 
@@ -41,14 +41,15 @@ type Props = {
   /** Called with the uploaded photo URLs, in order, whenever they change. */
   onUrlsChange?: (urls: string[]) => void;
   /**
-   * For sellers without an account yet: the server hands out a signed upload URL per photo instead of the browser
+   * For sellers without an account yet: a route that hands out a signed upload URL per photo (POST), used instead of
    * uploading to the signed-in user's own folder.
    */
-  getUploadTarget?: () => Promise<UploadTarget>;
+  uploadTargetUrl?: string;
   max?: number;
 };
 
-const CONCURRENCY = 3;
+/** Photos in flight at once. Decoding is further limited by the worker pool in lib/photo-pool. */
+const CONCURRENCY = 4;
 /** Long edge after resizing, and JPEG qualities tried in order (about 80%, lower only if a photo is still too big). */
 const PHOTO_MAX_DIMENSION = 2000;
 const PHOTO_QUALITIES = [0.8, 0.72, 0.64, 0.56];
@@ -57,6 +58,12 @@ const PHOTO_QUALITIES = [0.8, 0.72, 0.64, 0.56];
  * Uploads a file to Supabase Storage with XMLHttpRequest instead of fetch, which has no upload progress events. Sends
  * the same multipart body supabase-js does. `url` is a signed upload URL, or the object URL with a user's session.
  */
+async function requestUploadTarget(url: string): Promise<UploadTarget> {
+  const res = await fetch(url, { method: "POST" });
+  if (!res.ok) return { error: "Upload failed. Remove it and try again." };
+  return res.json();
+}
+
 function uploadWithProgress({ url, method, token, blob, onProgress }: { url: string; method: "POST" | "PUT"; token: string; blob: Blob; onProgress: (percent: number) => void }) {
   return new Promise<void>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
@@ -76,13 +83,20 @@ function uploadWithProgress({ url, method, token, blob, onProgress }: { url: str
   });
 }
 
-export function PhotoUploader({ userId, name, initialUrls = [], error, onBusyChange, onUrlsChange, getUploadTarget, max = LISTING_PHOTO_MAX }: Props) {
+export function PhotoUploader({ userId, name, initialUrls = [], error, onBusyChange, onUrlsChange, uploadTargetUrl, max = LISTING_PHOTO_MAX }: Props) {
   const inputId = useId();
   const [items, setItems] = useState<Item[]>(() =>
     initialUrls.map((url) => ({ id: url, url, status: "done", name: "photo" })),
   );
   const queue = useRef<{ id: string; file: File }[]>([]);
   const [limitNotice, setLimitNotice] = useState("");
+  const fileInput = useRef<HTMLInputElement>(null);
+  // On iPhone and iPad, not listing .heic lets iOS hand over JPEGs it converts itself, which is far faster than
+  // decoding HEIC in the page. Elsewhere, listing it keeps HEIC files selectable in desktop file pickers.
+  useEffect(() => {
+    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    if (ios && fileInput.current) fileInput.current.accept = "image/*";
+  }, []);
   const active = useRef(0);
   const previews = useRef(new Set<string>());
 
@@ -107,7 +121,10 @@ export function PhotoUploader({ userId, name, initialUrls = [], error, onBusyCha
   async function processOne(id: string, file: File) {
     try {
       update(id, { status: "processing" });
-      const blob = await prepareImage(file, { maxDimension: PHOTO_MAX_DIMENSION, maxBytes: 1_500_000, qualities: PHOTO_QUALITIES });
+      // Ask for the upload URL while the photo is being prepared; the two don't depend on each other.
+      const targetRequest = uploadTargetUrl ? requestUploadTarget(uploadTargetUrl) : null;
+      targetRequest?.catch(() => {}); // Handled below; don't let an early failure go unobserved.
+      const blob = await preparePhoto(file, { maxDimension: PHOTO_MAX_DIMENSION, maxBytes: 1_500_000, qualities: PHOTO_QUALITIES });
       const preview = URL.createObjectURL(blob);
       previews.current.add(preview);
       update(id, { status: "uploading", preview, progress: 0 });
@@ -116,8 +133,8 @@ export function PhotoUploader({ userId, name, initialUrls = [], error, onBusyCha
       const onProgress = (progress: number) => update(id, { progress });
       const supabase = createClient();
       let publicUrl: string;
-      if (getUploadTarget) {
-        const target = await getUploadTarget();
+      if (targetRequest) {
+        const target = await targetRequest;
         if ("error" in target) throw new Error(target.error);
         const url = `${base}/upload/sign/listing-photos/${target.path}?token=${encodeURIComponent(target.token)}`;
         await uploadWithProgress({ url, method: "PUT", token: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "", blob, onProgress });
@@ -249,6 +266,7 @@ export function PhotoUploader({ userId, name, initialUrls = [], error, onBusyCha
         <span className="mt-1 text-[13px] text-muted">JPEG, PNG, or HEIC</span>
       </label>
       <input
+        ref={fileInput}
         id={inputId}
         type="file"
         multiple

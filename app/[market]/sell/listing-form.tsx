@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { startTransition, useActionState, useCallback, useEffect, useRef, useState } from "react";
-import { PhotoUploader, type UploadTarget } from "@/components/photo-uploader";
+import { PhotoUploader } from "@/components/photo-uploader";
 import { Turnstile, type TurnstileHandle } from "@/components/turnstile";
 import { Button } from "@/components/ui";
 import { useZipCheck, ZipFeedback } from "@/components/zip-field";
@@ -22,7 +22,8 @@ export type DraftMode = {
   step: "contact" | "address" | "details" | "photos" | "submitted";
   photoMax: number;
   save: (formData: FormData) => Promise<{ ok: boolean }>;
-  getUploadTarget: () => Promise<UploadTarget>;
+  /** Route that hands out signed upload URLs for the draft's photos. */
+  uploadTargetUrl: string;
   startOver: () => Promise<void>;
 };
 
@@ -56,7 +57,11 @@ export function ListingForm({ mode, draft, source, userId, listingId, action, in
   const values = state.values ?? initial;
   const errors = state.errors ?? {};
   const [photosBusy, setPhotosBusy] = useState(false);
-  const onBusyChange = useCallback((busy: boolean) => setPhotosBusy(busy), []);
+  const photosBusyRef = useRef(false);
+  const onBusyChange = useCallback((busy: boolean) => {
+    photosBusyRef.current = busy;
+    setPhotosBusy(busy);
+  }, []);
   const [description, setDescription] = useState(values.description);
   const zipCheck = useZipCheck(zipDirectory, values.zip);
   const zipOutOfArea = mode === "create" && zipCheck.status === "unserved";
@@ -106,8 +111,11 @@ export function ListingForm({ mode, draft, source, userId, listingId, action, in
     if (saveTimer.current) clearTimeout(saveTimer.current);
   }, []);
   // Photo URLs land in hidden inputs after React commits, so read the form on the next task. Not requestAnimationFrame:
-  // it doesn't run while the tab is in the background, which is exactly when a seller waits on uploads.
-  const onUrlsChange = useCallback(() => void setTimeout(scheduleSave, 0), [scheduleSave]);
+  // it doesn't run while the tab is in the background, which is exactly when a seller waits on uploads. While a batch
+  // is still uploading, wait: one save when the last photo lands (or on a reorder) instead of one per photo.
+  const onUrlsChange = useCallback(() => {
+    if (!photosBusyRef.current) setTimeout(scheduleSave, 0);
+  }, [scheduleSave]);
 
   // Drafts need a Turnstile token to submit. A submit made before it arrives is held, then sent.
   const token = useRef("");
@@ -340,7 +348,7 @@ export function ListingForm({ mode, draft, source, userId, listingId, action, in
         error={errors.photos}
         onBusyChange={onBusyChange}
         onUrlsChange={onUrlsChange}
-        getUploadTarget={draft?.getUploadTarget}
+        uploadTargetUrl={draft?.uploadTargetUrl}
         max={draft?.photoMax}
       />
 
