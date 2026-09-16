@@ -1,6 +1,7 @@
 import "server-only";
 import { createHash, randomBytes } from "node:crypto";
 import { cookies, headers } from "next/headers";
+import { after } from "next/server";
 import { cityForZip, isServiceZip } from "@/lib/areas";
 import type { ListingDraft, ListingDraftStep } from "@/lib/database.types";
 import { sendEmail, sendEmailWithId, siteLink, type Unsubscribe } from "@/lib/email";
@@ -121,6 +122,22 @@ function storagePath(url: string) {
   return base && url.startsWith(base) && !url.includes("..") ? url.slice(base.length) : null;
 }
 
+const PHOTO_MOVE_CONCURRENCY = 10;
+
+/** Like Promise.all over items.map(fn), with at most `limit` running at once. Results keep the input order. */
+async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const index = next++;
+      results[index] = await fn(items[index]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
 const publicUrl = (path: string) => createAdminClient().storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
 
 /** Sends the "confirm your email" sign-in link for a submitted draft. */
@@ -158,24 +175,24 @@ export async function finalizeDraft(market: Market, draftId: string, user: { id:
   if (draft.status === "verified") return draft.listing_id ? { listingId: draft.listing_id, already: true } : null;
   if (draft.status !== "pending_verification" || !draft.zip || !draft.street || draft.price === null) return null;
 
-  // Photos move from drafts/<id>/ to <user id>/, where the seller's dashboard can manage them.
-  const photoUrls: string[] = [];
-  for (const url of draft.photo_urls) {
+  // Photos move from drafts/<id>/ to <user id>/, where the seller's dashboard, the photo URL guard in the database, and
+  // storage policies expect them. Each move is a separate storage request (~200ms), so they run several at a time.
+  const moves = await mapLimit(draft.photo_urls, PHOTO_MOVE_CONCURRENCY, async (url): Promise<string | null | false> => {
     const from = storagePath(url);
-    if (!from) continue;
+    if (!from) return null;
+    if (from.startsWith(`${user.id}/`)) return url;
+    if (!from.startsWith(`${draftPhotoFolder(draft.id)}/`)) return null;
     const to = `${user.id}/${from.split("/").pop()}`;
-    if (from.startsWith(`${draftPhotoFolder(draft.id)}/`)) {
-      const { error } = await admin.storage.from(BUCKET).move(from, to);
-      // Already moved by an earlier attempt.
-      if (error && !/not.?found/i.test(error.message)) {
-        console.error("draft photo move failed", error.message);
-        return null;
-      }
-      photoUrls.push(publicUrl(to));
-    } else if (from.startsWith(`${user.id}/`)) {
-      photoUrls.push(url);
+    const { error } = await admin.storage.from(BUCKET).move(from, to);
+    // "Not found": already moved by an earlier attempt (a double click, or a retry after a failure).
+    if (error && !/not.?found/i.test(error.message)) {
+      console.error("draft photo move failed", error.message);
+      return false;
     }
-  }
+    return publicUrl(to);
+  });
+  if (moves.includes(false)) return null;
+  const photoUrls = moves.filter((u): u is string => typeof u === "string");
   // finalize_listing_draft saves the moved URLs on the draft. If it fails, the draft keeps its old URLs, and a retry
   // treats files that are no longer in the draft folder as already moved.
   const { data, error } = await admin.rpc("finalize_listing_draft", {
@@ -190,10 +207,6 @@ export async function finalizeDraft(market: Market, draftId: string, user: { id:
     return null;
   }
 
-  // Photos the seller uploaded and then removed are still in the draft folder.
-  const leftovers = await draftFiles(draft.id).catch(() => []);
-  if (leftovers.length) await admin.storage.from(BUCKET).remove(leftovers);
-
   const listing = {
     id: created.id,
     slug: created.slug,
@@ -203,8 +216,18 @@ export async function finalizeDraft(market: Market, draftId: string, user: { id:
     hide_exact_address: draft.hide_exact_address,
     price: draft.price,
   };
-  await Promise.all([sendListingReceived(market, draft.email, listing), sendAdminNewListing(market, listing, draft.email)]);
-  return { listingId: created.id, already: false, source: draft.source };
+  // After the response: the "we received your listing" and admin emails, and removing photos the seller uploaded and
+  // then took out (still in the draft folder).
+  after(async () => {
+    await Promise.all([
+      sendListingReceived(market, draft.email, listing),
+      sendAdminNewListing(market, listing, draft.email),
+      draftFiles(draft.id)
+        .then((leftovers) => (leftovers.length ? admin.storage.from(BUCKET).remove(leftovers) : null))
+        .catch((e) => console.error("draft leftover cleanup failed", e)),
+    ]);
+  });
+  return { listingId: created.id, already: false, source: draft.source, fullName: draft.full_name, phone: draft.phone };
 }
 
 export type UploadTarget = { path: string; token: string; publicUrl: string } | { error: string };

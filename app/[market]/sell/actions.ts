@@ -3,6 +3,7 @@
 import { track } from "@vercel/analytics/server";
 import { updateTag } from "next/cache";
 import { headers } from "next/headers";
+import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { getCurrentProfile, getCurrentUser } from "@/lib/auth";
 import type { ListingStatus } from "@/lib/database.types";
@@ -78,17 +79,19 @@ export async function createListing(_prev: ListingFormState, formData: FormData)
     price,
   };
   const email = (await getCurrentProfile())?.email ?? user.email;
-  await Promise.all([
-    sendListingReceived(market, email, listing),
-    sendAdminNewListing(market, listing, email),
-    attachAiUsage(String(formData.get("draft_id") ?? ""), user.id, created.id),
-  ]);
-
   const source = String(formData.get("source") ?? "") || "direct";
-  await Promise.all([
-    track("submitted", { source, verified: true }, { headers: await headers() }).catch(() => {}),
-    logFunnelEvent(market.id, "submitted", source),
-  ]);
+  const draftId = String(formData.get("draft_id") ?? "");
+  const requestHeaders = await headers();
+  // Emails, AI usage bookkeeping, and analytics run after the redirect is sent.
+  after(async () => {
+    await Promise.all([
+      sendListingReceived(market, email, listing),
+      sendAdminNewListing(market, listing, email),
+      attachAiUsage(draftId, user.id, created.id),
+      track("submitted", { source, verified: true }, { headers: requestHeaders }).catch(() => {}),
+      logFunnelEvent(market.id, "submitted", source),
+    ]);
+  });
   redirect("/sell/checklist?submitted=1");
 }
 

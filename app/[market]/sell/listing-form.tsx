@@ -14,6 +14,7 @@ import type { ZipDirectory } from "@/lib/areas";
 import { trackFunnel } from "@/lib/funnel";
 import type { ListingFormState, ListingFormValues } from "@/lib/listing-form";
 import { DescriptionAssistant } from "./description-assistant";
+import { DraftSubmitted } from "./draft-submitted";
 
 /** A seller without an account yet: their unverified draft, saved as they go and confirmed by email on submit. */
 export type DraftMode = {
@@ -34,7 +35,7 @@ type Props = {
   source?: string | null;
   userId: string;
   listingId?: string;
-  action: (state: ListingFormState & { submitted?: boolean }, formData: FormData) => Promise<ListingFormState & { submitted?: boolean }>;
+  action: (state: SubmitState, formData: FormData) => Promise<SubmitState>;
   initial: ListingFormValues;
   /** A fresh id for this draft, so AI description runs can be matched to the listing once it's submitted. */
   draftId?: string;
@@ -50,10 +51,14 @@ type Props = {
 };
 
 const AUTOSAVE_MS = 1200;
+/** Turnstile tokens expire after 300 seconds; one older than this is replaced before submitting rather than rejected. */
+const TOKEN_MAX_AGE_MS = 270_000;
+
+type SubmitState = ListingFormState & { submitted?: boolean; email?: string; turnstileUsed?: boolean };
 
 export function ListingForm({ mode, draft, source, userId, listingId, action, initial, statusOptions = [], submitLabel, zipDirectory = {}, sellerEmail, disclosureNote, disclosureGuidePath, draftId }: Props) {
   const router = useRouter();
-  const [state, formAction, pending] = useActionState<ListingFormState & { submitted?: boolean }, FormData>(action, {});
+  const [state, formAction, pending] = useActionState<SubmitState, FormData>(action, {});
   const values = state.values ?? initial;
   const errors = state.errors ?? {};
   const [photosBusy, setPhotosBusy] = useState(false);
@@ -68,10 +73,6 @@ export function ListingForm({ mode, draft, source, userId, listingId, action, in
 
   const formRef = useRef<HTMLFormElement>(null);
 
-  // A submitted draft is replaced by the "check your email" page.
-  useEffect(() => {
-    if (state.submitted) router.refresh();
-  }, [state.submitted, router]);
 
   // Funnel: each event once. A resumed draft starts from the step it already saved.
   const reached = useRef({ start: Boolean(draft), address: draft ? draft.step !== "contact" : false, photos: draft ? ["photos", "submitted"].includes(draft.step) : false });
@@ -119,16 +120,19 @@ export function ListingForm({ mode, draft, source, userId, listingId, action, in
 
   // Drafts need a Turnstile token to submit. A submit made before it arrives is held, then sent.
   const token = useRef("");
+  const tokenAt = useRef(0);
   const queued = useRef<FormData | null>(null);
   const turnstile = useRef<TurnstileHandle>(null);
   const [waiting, setWaiting] = useState(false);
+  // Set from the first tap until the server answers, so a double tap can't send the form twice.
+  const sending = useRef(false);
   const onToken = useCallback(
     (t: string) => {
       token.current = t;
+      tokenAt.current = Date.now();
       const held = queued.current;
       if (t && held) {
         queued.current = null;
-        token.current = "";
         held.set("turnstile_token", t);
         setWaiting(false);
         startTransition(() => formAction(held));
@@ -137,14 +141,43 @@ export function ListingForm({ mode, draft, source, userId, listingId, action, in
     [formAction],
   );
   useEffect(() => {
-    if (state.status === "error") turnstile.current?.reset();
-  }, [state]);
+    // Any answer except a submitted draft (which swaps the form out) lets the form be sent again, including "saved" edits.
+    if (!state.submitted) sending.current = false;
+    if (state.status !== "error") return;
+    // A token the server never checked (the fields had errors) is still good; a spent one is replaced.
+    if (!draft || state.turnstileUsed) {
+      token.current = "";
+      turnstile.current?.reset();
+    }
+  }, [state, draft]);
+
+  /** Sends the form, or holds it until a fresh Turnstile token arrives. */
+  function send(formData: FormData) {
+    sending.current = true;
+    if (draft) {
+      if (token.current && Date.now() - tokenAt.current > TOKEN_MAX_AGE_MS) {
+        token.current = "";
+        turnstile.current?.reset();
+      }
+      if (!token.current) {
+        queued.current = formData;
+        setWaiting(true);
+        return;
+      }
+      formData.set("turnstile_token", token.current);
+    }
+    formAction(formData);
+  }
 
   // Fair Housing issues from the last submit attempt, re-checked live as the seller edits.
   const [issues, setIssues] = useState<FairHousingIssue[] | null>(null);
   const shownIssues = issues ?? state.fairHousing ?? [];
 
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+    if (sending.current) {
+      event.preventDefault();
+      return;
+    }
     const data = new FormData(event.currentTarget);
     const found = checkFairHousing(String(data.get("description") ?? ""));
     setIssues(found);
@@ -153,28 +186,23 @@ export function ListingForm({ mode, draft, source, userId, listingId, action, in
       document.getElementById("description")?.focus();
       return;
     }
-    if (draft && !token.current) {
+    if (draft && (!token.current || Date.now() - tokenAt.current > TOKEN_MAX_AGE_MS)) {
       event.preventDefault();
-      queued.current = data;
-      setWaiting(true);
+      send(data);
     }
   }
+
+  // Shown the moment the server accepts the draft; the confirmation email is sent after that response.
+  if (draft && state.submitted) return <DraftSubmitted email={state.email ?? draft.email} />;
 
   return (
     <form
       ref={formRef}
       key={state.submittedAt ?? "initial"}
       action={(formData) => {
-        if (draft) {
-          if (!token.current) {
-            queued.current = formData;
-            setWaiting(true);
-            return;
-          }
-          formData.set("turnstile_token", token.current);
-          token.current = "";
-        }
-        formAction(formData);
+        // A submit made before hydration is replayed straight into the action, skipping onSubmit.
+        if (sending.current && !queued.current) return;
+        send(formData);
       }}
       onSubmit={onSubmit}
       onFocus={() => {
@@ -356,7 +384,7 @@ export function ListingForm({ mode, draft, source, userId, listingId, action, in
         <Button
           type="submit"
           pending={pending || photosBusy || waiting}
-          pendingLabel={pending || waiting ? (mode === "create" ? "Submitting" : "Saving") : "Waiting for photos"}
+          pendingLabel={pending || waiting ? (mode === "create" ? "Submitting…" : "Saving…") : "Waiting for photos"}
           disabled={shownIssues.length > 0 || zipOutOfArea}
           className="sm:w-full"
         >

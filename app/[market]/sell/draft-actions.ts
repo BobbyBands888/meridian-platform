@@ -2,6 +2,7 @@
 
 import { track } from "@vercel/analytics/server";
 import { headers } from "next/headers";
+import { after } from "next/server";
 import { enrollInCourse } from "@/lib/course";
 import { logFunnelEvent } from "@/lib/funnel-log";
 import {
@@ -74,7 +75,7 @@ export async function startDraft(_prev: ContactFormState, formData: FormData): P
       console.error("draft contact update failed", error.code, error.message);
       return { status: "error", message: "We couldn't save your details. Please try again.", values };
     }
-    await logFunnelEvent(market.id, "contact_saved", existing.source, existing.id);
+    after(() => logFunnelEvent(market.id, "contact_saved", existing.source, existing.id));
     return { status: "saved" };
   }
 
@@ -109,10 +110,10 @@ export async function startDraft(_prev: ContactFormState, formData: FormData): P
     return { status: "error", message: "We couldn't save your details. Please try again.", values };
   }
   await setDraftCookie(token);
-  await logFunnelEvent(market.id, "contact_saved", source, created.id);
-
-  // The course starts when someone gives their email, not when they verify it.
-  await enrollInCourse(market, values.email, "/sell draft");
+  // After responding: the course starts when someone gives their email (not when they verify it), and day 1 goes out.
+  after(async () => {
+    await Promise.all([logFunnelEvent(market.id, "contact_saved", source, created.id), enrollInCourse(market, values.email, "/sell draft")]);
+  });
   return { status: "saved" };
 }
 
@@ -157,14 +158,22 @@ export async function saveDraft(formData: FormData): Promise<DraftSaveResult> {
   return { ok: true, step };
 }
 
-export type DraftSubmitState = ListingFormState & { submitted?: boolean };
+export type DraftSubmitState = ListingFormState & {
+  submitted?: boolean;
+  /** The address the confirmation email goes to, so the form can show "check your email" without reloading. */
+  email?: string;
+  /** Whether the server spent the Turnstile token, so the form only fetches a new one when it has to. */
+  turnstileUsed?: boolean;
+};
 
 /** Final submit: validates everything, marks the draft pending_verification, and emails the confirm link. */
 export async function submitDraft(_prev: DraftSubmitState, formData: FormData): Promise<DraftSubmitState> {
   const market = await getRequestMarket();
   if (!isLive(market)) return { status: "error", message: "Listings aren't open here yet.", submittedAt: Date.now() };
   const draft = await getCookieDraft(market);
-  if (!draft || draft.status !== "draft") {
+  // A second tap (or a retry after a dropped connection) finds the draft already submitted: same answer, no second email.
+  if (draft && draft.status !== "draft") return { submitted: true, email: draft.email };
+  if (!draft) {
     return { status: "error", message: "Your draft expired. Reload the page to start again.", submittedAt: Date.now() };
   }
 
@@ -174,7 +183,7 @@ export async function submitDraft(_prev: DraftSubmitState, formData: FormData): 
   if (Object.keys(errors).length > 0 || fairHousing.length > 0) return formErrorState(values, errors, fairHousing);
 
   if (!(await verifyTurnstile(String(formData.get("turnstile_token") ?? ""), await clientIp()))) {
-    return { status: "error", message: "We couldn't verify you're human. Please try again.", values, submittedAt: Date.now() };
+    return { status: "error", message: "We couldn't verify you're human. Please try again.", values, submittedAt: Date.now(), turnstileUsed: true };
   }
 
   const admin = createAdminClient();
@@ -197,22 +206,31 @@ export async function submitDraft(_prev: DraftSubmitState, formData: FormData): 
     .eq("id", draft.id)
     .eq("status", "draft")
     .select("*")
-    .single();
-  if (error || !updated) {
-    console.error("draft submit failed", error?.code, error?.message);
-    return { status: "error", message: "We couldn't submit your listing. Please try again.", values, submittedAt: Date.now() };
+    .maybeSingle();
+  if (error) {
+    console.error("draft submit failed", error.code, error.message);
+    return { status: "error", message: "We couldn't submit your listing. Please try again.", values, submittedAt: Date.now(), turnstileUsed: true };
   }
+  // No row: a simultaneous submit already moved it on.
+  if (!updated) return { submitted: true, email: draft.email };
 
-  await Promise.all([
-    track("submitted", { source: draft.source ?? "direct", verified: false }, { headers: await headers() }).catch(() => {}),
-    logFunnelEvent(market.id, "submitted", draft.source, draft.id),
-  ]);
-  try {
-    if (await allowSignInEmail(updated.email)) await sendDraftVerification(market, updated);
-  } catch (e) {
-    console.error("draft verification email failed", e);
-  }
-  return { submitted: true };
+  // The confirmation email (sign-in link, rate limit, Resend) and analytics go out after the response, so the seller
+  // sees "check your email" right away. If the send fails, the Resend button on that screen covers it.
+  const requestHeaders = await headers();
+  after(async () => {
+    await Promise.all([
+      track("submitted", { source: draft.source ?? "direct", verified: false }, { headers: requestHeaders }).catch(() => {}),
+      logFunnelEvent(market.id, "submitted", draft.source, draft.id),
+      (async () => {
+        try {
+          if (await allowSignInEmail(updated.email)) await sendDraftVerification(market, updated);
+        } catch (e) {
+          console.error("draft verification email failed", e);
+        }
+      })(),
+    ]);
+  });
+  return { submitted: true, email: updated.email };
 }
 
 export type ResendState = { status?: "sent" | "error"; message?: string };

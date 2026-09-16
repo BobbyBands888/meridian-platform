@@ -4,7 +4,7 @@ import { safeNextPath } from "@/lib/auth";
 import { requireMarket } from "@/lib/market-data";
 import { brandName } from "@/lib/markets";
 import { confirmSignIn } from "./actions";
-import { ContinueButton } from "./continue-button";
+import { ConfirmForm } from "./continue-button";
 
 export const metadata: Metadata = {
   title: "Continue signing in",
@@ -18,22 +18,24 @@ export default async function ConfirmPage({ params: routeParams, searchParams }:
   const value = (key: string) => (typeof params[key] === "string" ? (params[key] as string) : "");
   const next = safeNextPath(params.next);
   const hasLink = Boolean((value("token_hash") && value("type")) || value("code"));
+  const listing = Boolean(value("draft"));
 
   return (
     <Container className="py-16 sm:py-24">
       <div className="mx-auto max-w-md">
         {hasLink ? (
           <>
-            <h1 className="text-4xl font-bold tracking-tight">Continue signing in</h1>
-            <p className="mt-3 text-lg leading-relaxed text-muted">Tap the button to finish signing in to {brandName(market)}.</p>
-            <form action={confirmSignIn} className="mt-8">
-              <input type="hidden" name="token_hash" value={value("token_hash")} />
-              <input type="hidden" name="type" value={value("type")} />
-              <input type="hidden" name="code" value={value("code")} />
-              <input type="hidden" name="next" value={next} />
-              {value("draft") && <input type="hidden" name="draft" value={value("draft")} />}
-              <ContinueButton />
-            </form>
+            <h1 className="text-4xl font-bold tracking-tight">{listing ? "Confirm your listing" : "Continue signing in"}</h1>
+            <p className="mt-3 text-lg leading-relaxed text-muted">
+              {listing
+                ? `Tap the button to confirm your email. Your listing goes to our review queue and you're signed in to ${brandName(market)}.`
+                : `Tap the button to finish signing in to ${brandName(market)}.`}
+            </p>
+            <ConfirmForm
+              action={confirmSignIn}
+              listing={listing}
+              fields={{ token_hash: value("token_hash"), type: value("type"), code: value("code"), next, draft: value("draft") }}
+            />
           </>
         ) : (
           <>
