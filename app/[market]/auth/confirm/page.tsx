@@ -31,6 +31,7 @@ export default async function ConfirmPage({ params: routeParams, searchParams }:
               <input type="hidden" name="type" value={value("type")} />
               <input type="hidden" name="code" value={value("code")} />
               <input type="hidden" name="next" value={next} />
+              {value("draft") && <input type="hidden" name="draft" value={value("draft")} />}
               <ContinueButton />
             </form>
           </>

@@ -24,6 +24,7 @@ export const metadata: Metadata = {
 const TABS = [
   { key: "vendors", label: "Pending Vendors" },
   { key: "listings", label: "Pending Listings" },
+  { key: "drafts", label: "Drafts" },
   { key: "leads", label: "All Leads" },
   { key: "buyers", label: "Buyers" },
   { key: "markets", label: "Markets" },
@@ -81,7 +82,7 @@ export default async function AdminPage({ params: routeParams, searchParams }: P
   const notice = notices[String(params.done ?? "")];
 
   const admin = createAdminClient();
-  const [vendorsCount, editsCount, listingsCount, leadsCount, alertsActive, alertsTotal, buyersCount] = await Promise.all([
+  const [vendorsCount, editsCount, listingsCount, leadsCount, alertsActive, alertsTotal, buyersCount, draftsCount] = await Promise.all([
     scoped(admin.from("vendors").select("id", { count: "exact", head: true }).eq("status", "pending")),
     scoped(admin.from("vendor_pending_edits").select("vendor_id, vendors!inner(market_id)", { count: "exact", head: true }), "vendors.market_id"),
     scoped(admin.from("listings").select("id", { count: "exact", head: true }).eq("status", "pending")),
@@ -89,12 +90,14 @@ export default async function AdminPage({ params: routeParams, searchParams }: P
     scoped(admin.from("listing_alerts").select("id", { count: "exact", head: true }).is("unsubscribed_at", null)),
     scoped(admin.from("listing_alerts").select("id", { count: "exact", head: true })),
     scoped(admin.from("profiles").select("id", { count: "exact", head: true }).contains("roles", ["buyer"])),
+    scoped(admin.from("listing_drafts").select("id", { count: "exact", head: true }).neq("status", "verified")),
   ]);
   const alertSubscribers = alertsActive.count ?? 0;
   const alertUnsubscribed = (alertsTotal.count ?? 0) - alertSubscribers;
   const counts: Record<Tab, number> = {
     vendors: (vendorsCount.count ?? 0) + (editsCount.count ?? 0),
     listings: listingsCount.count ?? 0,
+    drafts: draftsCount.count ?? 0,
     leads: leadsCount.count ?? 0,
     buyers: (buyersCount.count ?? 0) + (alertsTotal.count ?? 0),
     markets: markets.length,
@@ -166,6 +169,7 @@ export default async function AdminPage({ params: routeParams, searchParams }: P
       <div className="mt-8">
         {tab === "vendors" && <PendingVendors scope={scope} marketsById={marketsById} />}
         {tab === "listings" && <PendingListings scope={scope} marketsById={marketsById} />}
+        {tab === "drafts" && <Drafts scope={scope} marketsById={marketsById} />}
         {tab === "leads" && <AllLeads scope={scope} marketsById={marketsById} page={page} type={leadType} />}
         {tab === "buyers" && <Buyers scope={scope} marketsById={marketsById} />}
         {tab === "markets" && <Markets markets={markets} returnTo={withScope(scope, "/admin?tab=markets")} />}
@@ -331,6 +335,80 @@ async function PendingListings({ scope, marketsById }: TabProps) {
         );
       })}
     </ul>
+  );
+}
+
+const DRAFTS_PREVIEW = 200;
+const draftStepLabels: Record<string, string> = {
+  contact: "Contact details",
+  address: "Address",
+  details: "Home details",
+  photos: "Photos",
+  submitted: "Submitted",
+};
+
+/** Started more than a day ago and still not submitted. */
+const isAbandonedDraft = (d: { status: string; created_at: string }) => d.status === "draft" && Date.parse(d.created_at) < Date.now() - 24 * 60 * 60 * 1000;
+
+/** Unverified listing drafts: sellers who started /sell without an account. A lead list, newest first. */
+async function Drafts({ scope, marketsById }: TabProps) {
+  let query = createAdminClient()
+    .from("listing_drafts")
+    .select("id, full_name, email, phone, zip, step, status, source, created_at, reminder_sent_at, market_id")
+    .neq("status", "verified")
+    .order("created_at", { ascending: false })
+    .limit(DRAFTS_PREVIEW);
+  if (scope.market) query = query.eq("market_id", scope.market.id);
+  const { data: drafts } = await query;
+
+  if (!drafts?.length) return <EmptyState title="No unverified drafts" />;
+
+  return (
+    <div className="overflow-x-auto rounded-2xl border border-line">
+      <table className="w-full min-w-[760px] text-left text-[14px]">
+        <thead className="bg-surface text-[13px] text-muted">
+          <tr>
+            <th className="px-4 py-3 font-medium">Name</th>
+            <th className="px-4 py-3 font-medium">Email</th>
+            <th className="px-4 py-3 font-medium">Phone</th>
+            <th className="px-4 py-3 font-medium">ZIP</th>
+            <th className="px-4 py-3 font-medium">Step reached</th>
+            <th className="px-4 py-3 font-medium">Created</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-line">
+          {drafts.map((d) => {
+            const market = marketsById.get(d.market_id);
+            const abandoned = isAbandonedDraft(d);
+            return (
+              <tr key={d.id} className="align-top">
+                <td className="px-4 py-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-semibold">{d.full_name}</span>
+                    <MarketBadge market={market} />
+                  </div>
+                  {d.source && <p className="text-[13px] text-muted">Source: {d.source}</p>}
+                </td>
+                <td className="break-all px-4 py-3">
+                  <a href={`mailto:${d.email}`} className="hover:underline">
+                    {d.email}
+                  </a>
+                </td>
+                <td className="whitespace-nowrap px-4 py-3">{d.phone ? formatUsPhone(d.phone) : "—"}</td>
+                <td className="px-4 py-3">{d.zip && market ? `${d.zip} · ${areaForZip(market, d.zip)}` : d.zip ?? "—"}</td>
+                <td className="px-4 py-3">
+                  {draftStepLabels[d.step] ?? d.step}
+                  <p className="text-[13px] text-muted">
+                    {d.status === "pending_verification" ? "Waiting on email confirmation" : abandoned ? `Abandoned${d.reminder_sent_at ? " · reminder sent" : ""}` : "In progress"}
+                  </p>
+                </td>
+                <td className="whitespace-nowrap px-4 py-3">{dateFmt.format(new Date(d.created_at))}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

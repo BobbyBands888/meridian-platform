@@ -4,6 +4,7 @@ import { areaForZip, cityForZip, isServiceZip } from "@/lib/areas";
 import { AI_MODEL, FEATURES_MAX, FEATURES_MIN, type DescriptionVariant } from "@/lib/ai-description";
 import { writeDescriptions } from "@/lib/anthropic";
 import { getCurrentUser } from "@/lib/auth";
+import { DRAFT_AI_LIMIT, getCookieDraft } from "@/lib/listing-drafts";
 import { getRequestMarket } from "@/lib/market-data";
 import { isLive } from "@/lib/markets";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -28,11 +29,13 @@ const toInt = (value: string) => {
  * sent: no street address, no price, and no text but the "notable features" box.
  */
 export async function writeDescription(formData: FormData): Promise<DescriptionState> {
-  const user = await getCurrentUser();
-  if (!user) return { status: "error", message: "Sign in again to use this." };
-
   const market = await getRequestMarket();
   if (!isLive(market)) return { status: "error", message: "This isn't available yet." };
+
+  // Signed-in sellers, or an unverified draft in this browser (which gets a smaller allowance).
+  const user = await getCurrentUser();
+  const draft = user ? null : await getCookieDraft(market);
+  if (!user && (!draft || draft.status !== "draft")) return { status: "error", message: "Reload the page and try again." };
 
   const text = (key: string) => String(formData.get(key) ?? "").trim();
   const draftId = text("draft_id");
@@ -42,7 +45,7 @@ export async function writeDescription(formData: FormData): Promise<DescriptionS
   const baths = Number(text("baths"));
   const sqft = toInt(text("sqft"));
 
-  if (!UUID.test(draftId)) return { status: "error", message: "Reload the page and try again." };
+  if (!UUID.test(draftId) || (draft && draftId !== draft.id)) return { status: "error", message: "Reload the page and try again." };
   if (features.length < FEATURES_MIN) {
     return { status: "error", message: `Add a few notable features first, at least ${FEATURES_MIN} characters.` };
   }
@@ -55,13 +58,32 @@ export async function writeDescription(formData: FormData): Promise<DescriptionS
 
   const admin = createAdminClient();
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  const { count } = await admin
-    .from("listing_ai_usage")
-    .select("id", { count: "exact", head: true })
-    .eq("profile_id", user.id)
-    .gte("created_at", since);
-  if ((count ?? 0) >= DAILY_LIMIT) {
-    return { status: "error", message: "You've used this a lot today. Try again tomorrow, or write the description yourself." };
+  if (user) {
+    const { count } = await admin
+      .from("listing_ai_usage")
+      .select("id", { count: "exact", head: true })
+      .eq("profile_id", user.id)
+      .gte("created_at", since);
+    if ((count ?? 0) >= DAILY_LIMIT) {
+      return { status: "error", message: "You've used this a lot today. Try again tomorrow, or write the description yourself." };
+    }
+  }
+
+  // Drafts claim a usage row before calling the model, so simultaneous requests can't get past the per-draft limit.
+  let claimId: string | null = null;
+  if (!user) {
+    const { data: claim, error: claimError } = await admin
+      .from("listing_ai_usage")
+      .insert({ draft_id: draftId, profile_id: null, market_id: market.id, model: AI_MODEL })
+      .select("id, created_at")
+      .single();
+    if (claimError || !claim) return { status: "error", message: "Something went wrong. Please try again." };
+    claimId = claim.id;
+    const { count } = await admin.from("listing_ai_usage").select("id", { count: "exact", head: true }).eq("draft_id", draftId).lte("created_at", claim.created_at);
+    if ((count ?? 0) > DRAFT_AI_LIMIT) {
+      await admin.from("listing_ai_usage").delete().eq("id", claimId);
+      return { status: "error", message: `You've used all ${DRAFT_AI_LIMIT} for this listing. Pick one of the drafts, or write the description yourself.` };
+    }
   }
 
   const result = await writeDescriptions({
@@ -76,18 +98,16 @@ export async function writeDescription(formData: FormData): Promise<DescriptionS
     features,
   });
 
-  if (!result.ok) return { status: "error", message: result.error };
+  if (!result.ok) {
+    if (claimId) await admin.from("listing_ai_usage").delete().eq("id", claimId);
+    return { status: "error", message: result.error };
+  }
 
-  // Logged against the draft now; createListing attaches the listing id once the seller submits.
-  const { error } = await admin.from("listing_ai_usage").insert({
-    draft_id: draftId,
-    profile_id: user.id,
-    market_id: market.id,
-    model: AI_MODEL,
-    input_tokens: result.usage.inputTokens,
-    output_tokens: result.usage.outputTokens,
-    variants: result.variants.length,
-  });
+  // Logged against the draft now; the listing id is attached once the seller submits (or verifies, for drafts).
+  const usage = { input_tokens: result.usage.inputTokens, output_tokens: result.usage.outputTokens, variants: result.variants.length };
+  const { error } = claimId
+    ? await admin.from("listing_ai_usage").update(usage).eq("id", claimId)
+    : await admin.from("listing_ai_usage").insert({ draft_id: draftId, profile_id: user?.id ?? null, market_id: market.id, model: AI_MODEL, ...usage });
   if (error) console.error("ai usage log failed", error.code, error.message);
 
   return { status: "ready", variants: result.variants };

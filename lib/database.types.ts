@@ -180,6 +180,43 @@ type CourseSignupRow = {
   unsubscribed_at: string | null;
 };
 
+export type ListingDraftStatus = "draft" | "pending_verification" | "verified";
+export type ListingDraftStep = "contact" | "address" | "details" | "photos" | "submitted";
+
+type ListingDraftRow = {
+  id: string;
+  market_id: string;
+  token_hash: string;
+  resume_token_hash: string | null;
+  status: ListingDraftStatus;
+  step: ListingDraftStep;
+  full_name: string;
+  email: string;
+  phone: string | null;
+  street: string | null;
+  zip: string | null;
+  hide_exact_address: boolean;
+  price: number | null;
+  beds: number | null;
+  baths: number | null;
+  sqft: number | null;
+  description: string | null;
+  photo_urls: string[];
+  photo_uploads: number;
+  source: string | null;
+  ip_hash: string | null;
+  unsubscribe_token: string;
+  reminder_sent_at: string | null;
+  reminders_unsubscribed_at: string | null;
+  submitted_at: string | null;
+  verification_sent_at: string | null;
+  verified_at: string | null;
+  profile_id: string | null;
+  listing_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 type AreaWaitlistRow = {
   id: string;
   email: string;
@@ -203,7 +240,7 @@ type CourseEmailRow = {
 type ListingAiUsageRow = {
   id: string;
   draft_id: string;
-  profile_id: string;
+  profile_id: string | null;
   market_id: string;
   listing_id: string | null;
   model: string;
@@ -273,6 +310,12 @@ export type Database = {
           { foreignKeyName: "course_emails_signup_id_fkey"; columns: ["signup_id"]; isOneToOne: false; referencedRelation: "course_signups"; referencedColumns: ["id"] },
         ];
       };
+      listing_drafts: {
+        Row: ListingDraftRow;
+        Insert: Pick<ListingDraftRow, "market_id" | "token_hash" | "full_name" | "email"> & Partial<ListingDraftRow>;
+        Update: Partial<ListingDraftRow>;
+        Relationships: [];
+      };
       area_waitlist: {
         Row: AreaWaitlistRow;
         Insert: Pick<AreaWaitlistRow, "email" | "market_id" | "zip"> & Partial<AreaWaitlistRow>;
@@ -281,7 +324,7 @@ export type Database = {
       };
       listing_ai_usage: {
         Row: ListingAiUsageRow;
-        Insert: Pick<ListingAiUsageRow, "draft_id" | "profile_id" | "market_id" | "model"> & Partial<ListingAiUsageRow>;
+        Insert: Pick<ListingAiUsageRow, "draft_id" | "market_id" | "model"> & Partial<ListingAiUsageRow>;
         Update: Partial<ListingAiUsageRow>;
         Relationships: [
           { foreignKeyName: "listing_ai_usage_listing_id_fkey"; columns: ["listing_id"]; isOneToOne: false; referencedRelation: "listings"; referencedColumns: ["id"] },
@@ -404,6 +447,10 @@ export type Database = {
         Returns: undefined;
       };
       apply_vendor_edit: { Args: { p_vendor_id: string }; Returns: boolean };
+      finalize_listing_draft: {
+        Args: { p_draft: string; p_profile: string; p_city: string; p_photo_urls: string[] };
+        Returns: { id: string; slug: string }[];
+      };
       submit_listing: {
         Args: {
           p_market: string;
@@ -445,3 +492,4 @@ export type PublicListing = Database["public"]["Views"]["public_listings"]["Row"
 export type ListingAlert = ListingAlertRow;
 export type Lead = LeadRow;
 export type CourseSignup = CourseSignupRow;
+export type ListingDraft = ListingDraftRow;

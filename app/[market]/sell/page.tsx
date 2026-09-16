@@ -2,14 +2,19 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Check } from "@/components/photo-card";
-import { ButtonLink, Container } from "@/components/ui";
+import { Container } from "@/components/ui";
 import { FocusZipLink, ZipChecker } from "@/components/zip-field";
 import { zipDirectory } from "@/lib/areas";
 import { getCurrentProfile, getCurrentUser, isProfileComplete } from "@/lib/auth";
 import { getDisclosureGuidePath } from "@/lib/guides";
 import { requireMarket } from "@/lib/market-data";
-import { brandName, countyList, serviceArea } from "@/lib/markets";
+import { DRAFT_PHOTO_MAX, draftFormValues, getCookieDraft } from "@/lib/listing-drafts";
+import { LISTING_PHOTO_MAX } from "@/lib/listings";
+import { brandName, countyList, serviceArea, type Market } from "@/lib/markets";
 import { createListing } from "./actions";
+import { ContactStep } from "./contact-step";
+import { draftPhotoUploadTarget, forgetDraft, saveDraft, submitDraft } from "./draft-actions";
+import { DraftSubmitted } from "./draft-submitted";
 import { ListingForm } from "./listing-form";
 
 export async function generateMetadata({ params }: PageProps<"/[market]/sell">): Promise<Metadata> {
@@ -21,7 +26,7 @@ export async function generateMetadata({ params }: PageProps<"/[market]/sell">):
   };
 }
 
-const points = ["Free to list", "Buyers contact you directly", "Reviewed before it goes live", "Up to 20 photos"];
+const points = ["Free to list", "Buyers contact you directly", "Reviewed before it goes live"];
 
 function ChecklistLink() {
   return (
@@ -35,10 +40,18 @@ function ChecklistLink() {
   );
 }
 
-export default async function SellPage({ params }: PageProps<"/[market]/sell">) {
+export default async function SellPage({ params, searchParams }: PageProps<"/[market]/sell">) {
   const market = await requireMarket((await params).market);
+  const query = await searchParams;
   const user = await getCurrentUser();
   if (user && !isProfileComplete(await getCurrentProfile())) redirect("/welcome?next=/sell");
+
+  // Signed out: the seller's draft on this device, if they've started one.
+  const draft = user ? null : await getCookieDraft(market);
+  const sParam = typeof query.s === "string" && /^[a-z0-9_-]{1,60}$/i.test(query.s) ? query.s.toLowerCase() : null;
+  const source = draft?.source ?? sParam;
+  const photoLimit = user ? LISTING_PHOTO_MAX : DRAFT_PHOTO_MAX;
+  const directory = zipDirectory(market);
 
   return (
     <Container className="py-12 sm:py-16">
@@ -48,11 +61,13 @@ export default async function SellPage({ params }: PageProps<"/[market]/sell">) 
           List your home free and hear from buyers yourself, anywhere in {serviceArea(market, countyList(market, "or"))}. You stay in charge of pricing,
           showings, and who you hire to close.
         </p>
-        <p className="mt-3 text-[15px]">
-          Not sure if we serve your area? <FocusZipLink targetId={user ? "zip" : "zip-check"}>Check your ZIP</FocusZipLink>
-        </p>
+        {draft?.status !== "pending_verification" && (
+          <p className="mt-3 text-[15px]">
+            Not sure if we serve your area? <FocusZipLink targetId="zip">Check your ZIP</FocusZipLink>
+          </p>
+        )}
         <ul className="mt-6 grid gap-2 sm:grid-cols-2">
-          {points.map((p) => (
+          {[...points, `Up to ${photoLimit} photos`].map((p) => (
             <li key={p}>
               <Check label={p} />
             </li>
@@ -60,41 +75,77 @@ export default async function SellPage({ params }: PageProps<"/[market]/sell">) 
         </ul>
         <ChecklistLink />
 
-        {user ? (
-          <div className="mt-10">
-            <ListingForm
-              mode="create"
-              zipDirectory={zipDirectory(market)}
-              sellerEmail={user.email}
-              disclosureNote={market.disclosure_note}
-              disclosureGuidePath={await getDisclosureGuidePath(market.slug)}
-              userId={user.id}
-              action={createListing}
-              submitLabel="Submit listing for review"
-              draftId={crypto.randomUUID()}
-              initial={{ street: "", zip: "", hide_exact_address: false, price: "", beds: "", baths: "", sqft: "", description: "", photo_urls: [] }}
-            />
-            <p className="mt-6 text-[13px] leading-relaxed text-muted">
-              {brandName(market)} is not a broker and doesn&apos;t give pricing or legal advice. We recommend a real estate attorney
-              for your contract and closing.
-            </p>
-          </div>
-        ) : (
-          <div className="mt-10 rounded-2xl border border-line p-6">
-            <h2 className="text-xl font-semibold tracking-tight">Sign in to list your home</h2>
-            <p className="mt-2 text-[15px] leading-relaxed text-muted">
-              We&apos;ll email you a sign-in link. Then add your address, details, and photos. We review every listing, usually
-              within 24 hours.
-            </p>
-            <div className="mt-5">
-              <ZipChecker id="zip-check" directory={zipDirectory(market)} source="/sell" />
-            </div>
-            <ButtonLink href="/sign-in?next=/sell" className="mt-5">
-              Sign in to list your home
-            </ButtonLink>
-          </div>
+        {query.draft === "unavailable" && (
+          <p role="alert" className="mt-8 rounded-xl border border-red-200 bg-red-50 p-4 text-[15px] text-red-900">
+            That confirmation link doesn&apos;t match a listing waiting for this email. If you started a listing with another address,
+            open the link sent there.
+          </p>
         )}
+
+        <div className="mt-10">
+          {user ? (
+            <>
+              <ListingForm
+                mode="create"
+                source={sParam}
+                zipDirectory={directory}
+                sellerEmail={user.email}
+                disclosureNote={market.disclosure_note}
+                disclosureGuidePath={await getDisclosureGuidePath(market.slug)}
+                userId={user.id}
+                action={createListing}
+                submitLabel="Submit listing for review"
+                draftId={crypto.randomUUID()}
+                initial={{ street: "", zip: "", hide_exact_address: false, price: "", beds: "", baths: "", sqft: "", description: "", photo_urls: [] }}
+              />
+              <Disclaimer market={market} />
+            </>
+          ) : draft?.status === "pending_verification" ? (
+            <DraftSubmitted email={draft.email} />
+          ) : draft?.status === "draft" ? (
+            <>
+              <ListingForm
+                mode="create"
+                source={source}
+                draft={{
+                  email: draft.email,
+                  step: draft.step,
+                  photoMax: DRAFT_PHOTO_MAX,
+                  save: saveDraft,
+                  getUploadTarget: draftPhotoUploadTarget,
+                  startOver: forgetDraft,
+                }}
+                zipDirectory={directory}
+                sellerEmail={draft.email}
+                disclosureNote={market.disclosure_note}
+                disclosureGuidePath={await getDisclosureGuidePath(market.slug)}
+                userId={draft.id}
+                action={submitDraft}
+                submitLabel="Submit listing"
+                draftId={draft.id}
+                initial={draftFormValues(draft)}
+              />
+              <Disclaimer market={market} />
+            </>
+          ) : (
+            <>
+              <ContactStep source={sParam} />
+              <div className="mt-6">
+                <ZipChecker id="zip" directory={directory} source="/sell" />
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </Container>
+  );
+}
+
+function Disclaimer({ market }: { market: Market }) {
+  return (
+    <p className="mt-6 text-[13px] leading-relaxed text-muted">
+      {brandName(market)} is not a broker and doesn&apos;t give pricing or legal advice. We recommend a real estate attorney for
+      your contract and closing.
+    </p>
   );
 }

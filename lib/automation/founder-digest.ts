@@ -8,6 +8,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { categoryByValue } from "@/lib/vendors";
 import type { DigestSummary } from "./buyer-alerts";
 import type { CourseSendResult } from "@/lib/course";
+import type { DraftCleanupResult, DraftReminderResult } from "@/lib/listing-drafts";
 import type { LifecycleSummary } from "./vendor-lifecycle";
 import { daysAgo, localDate, zonedMidnight } from "./time";
 
@@ -15,7 +16,14 @@ import { daysAgo, localDate, zonedMidnight } from "./time";
 const FOUNDER_TIME_ZONE = "America/Chicago";
 const LIST_MAX = 15;
 
-export type RunReport = { alertDigests?: DigestSummary; vendorEmails?: LifecycleSummary; courseEmails?: CourseSendResult; errors: string[] };
+export type RunReport = {
+  alertDigests?: DigestSummary;
+  vendorEmails?: LifecycleSummary;
+  courseEmails?: CourseSendResult;
+  draftReminders?: DraftReminderResult;
+  draftCleanup?: DraftCleanupResult;
+  errors: string[];
+};
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
 
@@ -46,7 +54,7 @@ export async function buildFounderDigest(report: RunReport, now = new Date(), { 
   const todayStart = zonedMidnight(FOUNDER_TIME_ZONE, y, mo, d);
   const yesterdayStart = new Date(todayStart.getTime() - 24 * 60 * 60 * 1000);
 
-  const [pendingVendors, pendingListings, pendingEdits, recentLeads, approvedVendors, signups, syndication, alertSends, activeListings, activeAlerts, courseSignups] =
+  const [pendingVendors, pendingListings, pendingEdits, recentLeads, approvedVendors, signups, syndication, alertSends, activeListings, activeAlerts, courseSignups, newDrafts, abandonedDrafts] =
     await Promise.all([
       admin.from("vendors").select("business_name, category, market_id, created_at").eq("status", "pending").order("created_at"),
       admin.from("listings").select("street, city, zip, market_id, created_at").eq("status", "pending").order("created_at"),
@@ -59,8 +67,11 @@ export async function buildFounderDigest(report: RunReport, now = new Date(), { 
       admin.from("listings").select("market_id").eq("status", "active"),
       admin.from("listing_alerts").select("market_id").is("unsubscribed_at", null),
       admin.from("course_signups").select("market_id").gte("created_at", yesterdayStart.toISOString()).lt("created_at", todayStart.toISOString()),
+      // Listing drafts started in the last 24 hours, and ones still unsubmitted a day or more after they were started.
+      admin.from("listing_drafts").select("market_id").gte("created_at", dayAgo),
+      admin.from("listing_drafts").select("market_id").eq("status", "draft").lt("created_at", dayAgo),
     ]);
-  for (const r of [pendingVendors, pendingListings, pendingEdits, recentLeads, approvedVendors, signups, syndication, alertSends, activeListings, activeAlerts, courseSignups]) {
+  for (const r of [pendingVendors, pendingListings, pendingEdits, recentLeads, approvedVendors, signups, syndication, alertSends, activeListings, activeAlerts, courseSignups, newDrafts, abandonedDrafts]) {
     if (r.error) throw new Error(`Founder digest query failed: ${r.error.message}`);
   }
 
@@ -76,12 +87,14 @@ export async function buildFounderDigest(report: RunReport, now = new Date(), { 
   const leads = await attachLeadTargets(recentLeads.data ?? []);
   const facebookIssues = syndication.data ?? [];
   const alertFailures = (alertSends.data ?? []).filter((s) => s.status === "failed").length;
-  const emailFailures = alertFailures + (report.alertDigests?.failed ?? 0) + (report.vendorEmails?.failed ?? 0) + (report.courseEmails?.failed ?? 0);
+  const emailFailures = alertFailures + (report.alertDigests?.failed ?? 0) + (report.vendorEmails?.failed ?? 0) + (report.courseEmails?.failed ?? 0) + (report.draftReminders?.failed ?? 0);
 
   const reviewCount = (pendingVendors.data?.length ?? 0) + (pendingListings.data?.length ?? 0) + (pendingEdits.data?.length ?? 0);
   const signupCount = signups.data?.length ?? 0;
   const courseSignupCount = courseSignups.data?.length ?? 0;
-  const hasNews = reviewCount + leads.length + quietVendors.length + signupCount + courseSignupCount + facebookIssues.length + emailFailures + report.errors.length > 0;
+  const newDraftCount = newDrafts.data?.length ?? 0;
+  const abandonedDraftCount = abandonedDrafts.data?.length ?? 0;
+  const hasNews = reviewCount + leads.length + quietVendors.length + signupCount + courseSignupCount + newDraftCount + abandonedDraftCount + facebookIssues.length + emailFailures + report.errors.length > 0;
   if (!hasNews && !force) return null;
 
   const market = markets.find((m) => m.slug === DEFAULT_MARKET_SLUG) ?? markets[0];
@@ -128,6 +141,16 @@ export async function buildFounderDigest(report: RunReport, now = new Date(), { 
     blocks.push({ kind: "list", items: [...perMarket].map(([id, n]) => ({ text: `${label(id)}: ${n}` })) });
   }
 
+  blocks.push({ kind: "heading", text: "Listing drafts" });
+  blocks.push({
+    kind: "list",
+    items: [
+      { text: `${plural(newDraftCount, "new draft")} started in the last 24 hours` },
+      { text: `${plural(abandonedDraftCount, "abandoned draft")} (started over a day ago, not submitted)` },
+    ],
+  });
+  if (newDraftCount + abandonedDraftCount) blocks.push({ kind: "button", label: "See drafts", href: adminLink("/admin?tab=drafts&market=all") });
+
   const automation: string[] = [];
   const sends = alertSends.data ?? [];
   const instantSent = sends.filter((s) => s.status === "sent" && s.via === "instant").length;
@@ -143,6 +166,10 @@ export async function buildFounderDigest(report: RunReport, now = new Date(), { 
     const c = report.courseEmails;
     if (c.sent + c.skipped + c.failed) automation.push(`Seller course: ${plural(c.sent, "email")} sent, ${c.completed} finished the week, ${c.skipped} skipped, ${c.failed} failed`);
   }
+  if (report.draftReminders && report.draftReminders.sent + report.draftReminders.failed)
+    automation.push(`Draft reminders: ${plural(report.draftReminders.sent, "email")} sent, ${report.draftReminders.failed} failed`);
+  if (report.draftCleanup && report.draftCleanup.drafts)
+    automation.push(`Draft cleanup: ${plural(report.draftCleanup.drafts, "expired draft")} and ${plural(report.draftCleanup.files, "photo")} deleted`);
   for (const f of facebookIssues) {
     automation.push(`Facebook ${f.status === "skipped" ? "post skipped" : "post failed"} for ${label(f.market_id)}: ${f.error ?? "no details"}`);
   }

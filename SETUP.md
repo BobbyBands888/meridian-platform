@@ -50,6 +50,7 @@ Run each file in `supabase/migrations/` in filename order, once each (re-running
 8. `20260921000000_automation.sql` (Phase 8: alert send log, vendor email log, Facebook post log, vendor approval date and email preferences, market launch date)
 9. `20260922000000_growth.sql` (Phase 9: signup market on profiles, expressions of interest, the seven-day email course, AI description usage)
 10. `20260923000000_service_area.sql` (Nashville's ten-county service area, out-of-area email waitlist)
+11. `20260924000000_listing_drafts.sql` (List without signing in first: unverified listing drafts, email confirmation at submit)
 
 If you ever re-run an earlier file, re-run every later file after it too, since later files replace some of its functions.
 
@@ -231,6 +232,8 @@ Every market's site footer, the hub footer, and every email footer show `Ownvist
 | Daily job | **Vendor day 14:** "How's it going?" with their inquiry count, reply-to `ADMIN_EMAIL`, 14 to 21 days after approval. | Yes |
 | Daily job, on the 1st (catches up on the 2nd and 3rd) | **Vendor monthly summary:** "You received N inquiries through <Market> Buys in <month>" with the list, or "Here's how to get your first inquiry" with the three tips. Skipped for vendors approved in the last 3 days of the month. | Yes |
 | Signup, then daily job | **Seven-day seller course:** one email a day for a week, each covering a section of the pre-sale checklist with links to the matching guide and vendor category. Day 1 goes out the moment someone signs up (at `/sell/course` or from the checklist page); the daily job sends days 2 to 7. Anyone who has listed a home is dropped from the course. | Yes |
+| Daily job | **Listing draft reminder:** one email, ever, to a seller who started /sell without an account and hasn't submitted 24 hours later, with a link that resumes the draft. | Yes |
+| Daily job | **Draft cleanup:** unverified drafts and their photos are deleted 14 days after they were started. | n/a |
 | Daily job | **Founder digest** to `ADMIN_EMAIL`: pending vendors, listings, and edits; leads in the last 24 hours; vendors approved 30+ days ago with no inquiries; alert signups yesterday; skipped or failed automation (like a missing Facebook token); a line per market. Not sent when there's nothing to report. | No |
 
 Vendor emails only go to approved vendors in live markets. For a vendor approved before their market launched, day 2 and day 14 count from the launch date. Every email, marketing or not, has the Ownvista mailing address in the footer. Vendors can turn off tips and monthly summaries from the link in those emails; approval and inquiry emails always go out. Every send is logged (`listing_alert_sends`, `vendor_emails`, `listing_syndication`, `course_emails`), and the admin listing page shows each approved listing's alert and Facebook results.

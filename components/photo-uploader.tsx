@@ -28,17 +28,27 @@ type Item = {
   name: string;
 };
 
+export type UploadTarget = { path: string; token: string; publicUrl: string } | { error: string };
+
 type Props = {
   userId: string;
   name: string;
   initialUrls?: string[];
   error?: string;
   onBusyChange?: (busy: boolean) => void;
+  /** Called with the uploaded photo URLs, in order, whenever they change. */
+  onUrlsChange?: (urls: string[]) => void;
+  /**
+   * For sellers without an account yet: the server hands out a signed upload URL per photo instead of the browser
+   * uploading to the signed-in user's own folder.
+   */
+  getUploadTarget?: () => Promise<UploadTarget>;
+  max?: number;
 };
 
 const CONCURRENCY = 3;
 
-export function PhotoUploader({ userId, name, initialUrls = [], error, onBusyChange }: Props) {
+export function PhotoUploader({ userId, name, initialUrls = [], error, onBusyChange, onUrlsChange, getUploadTarget, max = LISTING_PHOTO_MAX }: Props) {
   const inputId = useId();
   const [items, setItems] = useState<Item[]>(() =>
     initialUrls.map((url) => ({ id: url, url, status: "done", name: "photo" })),
@@ -49,6 +59,15 @@ export function PhotoUploader({ userId, name, initialUrls = [], error, onBusyCha
 
   const busy = items.some((i) => i.status !== "done" && i.status !== "error");
   useEffect(() => onBusyChange?.(busy), [busy, onBusyChange]);
+  const urlKey = items.flatMap((i) => (i.status === "done" && i.url ? [i.url] : [])).join("\n");
+  const firstRender = useRef(true);
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    onUrlsChange?.(urlKey ? urlKey.split("\n") : []);
+  }, [urlKey, onUrlsChange]);
   useEffect(() => {
     const urls = previews.current;
     return () => urls.forEach((u) => URL.revokeObjectURL(u));
@@ -64,13 +83,19 @@ export function PhotoUploader({ userId, name, initialUrls = [], error, onBusyCha
       previews.current.add(preview);
       update(id, { status: "uploading", preview });
 
-      const supabase = createClient();
+      const bucket = createClient().storage.from("listing-photos");
+      if (getUploadTarget) {
+        const target = await getUploadTarget();
+        if ("error" in target) throw new Error(target.error);
+        const { error: uploadError } = await bucket.uploadToSignedUrl(target.path, target.token, blob, { contentType: "image/jpeg", cacheControl: "31536000" });
+        if (uploadError) throw new Error("Upload failed. Remove it and try again.");
+        update(id, { status: "done", url: target.publicUrl });
+        return;
+      }
       const path = `${userId}/${crypto.randomUUID()}.jpg`;
-      const { error: uploadError } = await supabase.storage
-        .from("listing-photos")
-        .upload(path, blob, { contentType: "image/jpeg", cacheControl: "31536000", upsert: false });
+      const { error: uploadError } = await bucket.upload(path, blob, { contentType: "image/jpeg", cacheControl: "31536000", upsert: false });
       if (uploadError) throw new Error("Upload failed. Remove it and try again.");
-      update(id, { status: "done", url: supabase.storage.from("listing-photos").getPublicUrl(path).data.publicUrl });
+      update(id, { status: "done", url: bucket.getPublicUrl(path).data.publicUrl });
     } catch (e) {
       update(id, { status: "error", error: e instanceof Error ? e.message : "Couldn't process this photo." });
     }
@@ -89,7 +114,7 @@ export function PhotoUploader({ userId, name, initialUrls = [], error, onBusyCha
 
   function addFiles(files: FileList | null) {
     if (!files?.length) return;
-    const room = LISTING_PHOTO_MAX - items.filter((i) => i.status !== "error").length;
+    const room = max - items.filter((i) => i.status !== "error").length;
     const accepted = Array.from(files).slice(0, Math.max(0, room));
     const added = accepted.map((file) => ({ id: crypto.randomUUID(), file }));
     setItems((prev) => [...prev, ...added.map(({ id, file }) => ({ id, status: "queued" as const, name: file.name }))]);
@@ -126,7 +151,7 @@ export function PhotoUploader({ userId, name, initialUrls = [], error, onBusyCha
 
   const positionOf = (id: string | number) => items.findIndex((i) => i.id === id) + 1;
   const count = items.filter((i) => i.status !== "error").length;
-  const full = count >= LISTING_PHOTO_MAX;
+  const full = count >= max;
   const doneCount = items.filter((i) => i.status === "done").length;
 
   return (
@@ -135,11 +160,11 @@ export function PhotoUploader({ userId, name, initialUrls = [], error, onBusyCha
         <div>
           <span className="block text-[15px] font-medium">Photos</span>
           <p className="mt-1 text-[13px] text-muted">
-            Up to {LISTING_PHOTO_MAX}. iPhone photos are fine. Drag to reorder; the first photo is the cover.
+            Up to {max}. iPhone photos are fine. Drag to reorder; the first photo is the cover.
           </p>
         </div>
         <span className="shrink-0 text-[14px] text-muted" aria-live="polite">
-          {count}/{LISTING_PHOTO_MAX}
+          {count}/{max}
         </span>
       </div>
 

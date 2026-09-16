@@ -1,79 +1,21 @@
 "use server";
 
+import { track } from "@vercel/analytics/server";
 import { updateTag } from "next/cache";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getCurrentProfile, getCurrentUser } from "@/lib/auth";
 import type { ListingStatus } from "@/lib/database.types";
-import { checkFairHousing, type FairHousingIssue } from "@/lib/fair-housing";
 import { sendAdminDescriptionEdit, sendAdminNewListing, sendListingReceived } from "@/lib/listing-emails";
-import { DESCRIPTION_MAX, DESCRIPTION_MIN, LISTING_PHOTO_MAX } from "@/lib/listings";
-import { cityForZip, listingZipError } from "@/lib/areas";
+import { cityForZip } from "@/lib/areas";
+import { formErrorState, readListingForm, validateNewListingFields, validateShared, type ListingFormState } from "@/lib/listing-form";
 import { getMarketById, getRequestMarket } from "@/lib/market-data";
 import { isLive } from "@/lib/markets";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CACHE_TAGS } from "@/lib/supabase/public";
 import { createClient } from "@/lib/supabase/server";
 
-type Field = "street" | "zip" | "price" | "beds" | "baths" | "sqft" | "description" | "photos" | "status";
-
-export type ListingFormValues = {
-  street: string;
-  zip: string;
-  hide_exact_address: boolean;
-  price: string;
-  beds: string;
-  baths: string;
-  sqft: string;
-  description: string;
-  photo_urls: string[];
-  status?: ListingStatus;
-};
-
-export type ListingFormState = {
-  status?: "error" | "saved";
-  message?: string;
-  errors?: Partial<Record<Field, string>>;
-  fairHousing?: FairHousingIssue[];
-  values?: ListingFormValues;
-  submittedAt?: number;
-};
-
-function readForm(formData: FormData): ListingFormValues {
-  const text = (key: string) => String(formData.get(key) ?? "").trim();
-  return {
-    street: text("street").replace(/\s+/g, " "),
-    zip: text("zip"),
-    hide_exact_address: formData.get("hide_exact_address") === "on",
-    price: text("price"),
-    beds: text("beds"),
-    baths: text("baths"),
-    sqft: text("sqft"),
-    description: text("description"),
-    photo_urls: formData.getAll("photo_urls").map(String).filter(Boolean),
-    status: (text("status") || undefined) as ListingStatus | undefined,
-  };
-}
-
-const toInt = (v: string) => (/^\d+$/.test(v.replace(/[$,\s]/g, "")) ? Number(v.replace(/[$,\s]/g, "")) : NaN);
-
-function isOwnPhoto(url: string, userId: string) {
-  const base = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, "");
-  return Boolean(base) && url.startsWith(`${base}/storage/v1/object/public/listing-photos/${userId}/`) && !url.includes("..");
-}
-
-function validateShared(values: ListingFormValues, userId: string) {
-  const errors: ListingFormState["errors"] = {};
-  const price = toInt(values.price);
-  if (!Number.isFinite(price) || price < 1000 || price > 100_000_000) errors.price = "Enter an asking price in whole dollars.";
-  if (values.description.length < DESCRIPTION_MIN) errors.description = `Write at least ${DESCRIPTION_MIN} characters so buyers know what makes the home special.`;
-  if (values.description.length > DESCRIPTION_MAX) errors.description = `Keep the description under ${DESCRIPTION_MAX.toLocaleString()} characters.`;
-  const photos = values.photo_urls;
-  if (photos.length < 1) errors.photos = "Add at least one photo.";
-  else if (photos.length > LISTING_PHOTO_MAX) errors.photos = `Use ${LISTING_PHOTO_MAX} photos or fewer.`;
-  else if (!photos.every((u) => isOwnPhoto(u, userId))) errors.photos = "Some photos didn't upload correctly. Remove them and add them again.";
-  const fairHousing = checkFairHousing(values.description);
-  return { errors, price, fairHousing };
-}
+export type { ListingFormState, ListingFormValues } from "@/lib/listing-form";
 
 const DRAFT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -95,31 +37,14 @@ async function attachAiUsage(draftId: string, profileId: string, listingId: stri
 export async function createListing(_prev: ListingFormState, formData: FormData): Promise<ListingFormState> {
   const user = await getCurrentUser();
   if (!user) redirect("/sign-in?next=/sell");
-  const values = readForm(formData);
-  const { errors, price, fairHousing } = validateShared(values, user.id);
+  const values = readListingForm(formData);
+  const { errors, price, fairHousing } = validateShared(values, { photoFolder: user.id });
 
   const market = await getRequestMarket();
   if (!isLive(market)) redirect("/");
-  if (values.street.length < 3 || values.street.length > 160 || !/\d/.test(values.street)) errors.street = "Enter the street address, like 1234 Main St.";
-  const zipError = listingZipError(market, values.zip);
-  if (zipError) errors.zip = zipError;
-  const beds = Number(values.beds);
-  if (!Number.isInteger(beds) || beds < 0 || beds > 20) errors.beds = "Enter the number of bedrooms.";
-  const baths = Number(values.baths);
-  if (!Number.isFinite(baths) || baths < 0 || baths > 20 || (baths * 2) % 1 !== 0) errors.baths = "Enter bathrooms in halves, like 2 or 2.5.";
-  const sqft = toInt(values.sqft);
-  if (!Number.isFinite(sqft) || sqft < 100 || sqft > 50_000) errors.sqft = "Enter the finished square footage.";
+  const { beds, baths, sqft } = validateNewListingFields(market, values, errors);
 
-  if (Object.keys(errors).length > 0 || fairHousing.length > 0) {
-    return {
-      status: "error",
-      message: fairHousing.length > 0 && Object.keys(errors).length === 0 ? "Edit the highlighted phrases in your description to continue." : "Please fix the highlighted fields.",
-      errors,
-      fairHousing,
-      values,
-      submittedAt: Date.now(),
-    };
-  }
+  if (Object.keys(errors).length > 0 || fairHousing.length > 0) return formErrorState(values, errors, fairHousing);
 
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("submit_listing", {
@@ -158,6 +83,7 @@ export async function createListing(_prev: ListingFormState, formData: FormData)
     attachAiUsage(String(formData.get("draft_id") ?? ""), user.id, created.id),
   ]);
 
+  await track("submitted", { source: String(formData.get("source") ?? "") || "direct", verified: true }, { headers: await headers() }).catch(() => {});
   redirect("/sell/checklist?submitted=1");
 }
 
@@ -167,8 +93,8 @@ export async function updateListing(_prev: ListingFormState, formData: FormData)
   const user = await getCurrentUser();
   const listingId = String(formData.get("listing_id") ?? "");
   if (!user) redirect(`/sign-in?next=/dashboard/listing/${listingId}`);
-  const values = readForm(formData);
-  const { errors, price, fairHousing } = validateShared(values, user.id);
+  const values = readListingForm(formData);
+  const { errors, price, fairHousing } = validateShared(values, { photoFolder: user.id });
 
   const supabase = await createClient();
   const { data: current } = await supabase
@@ -183,16 +109,7 @@ export async function updateListing(_prev: ListingFormState, formData: FormData)
 
   const nextStatus = values.status && SELLER_STATUSES.includes(current.status) && SELLER_STATUSES.includes(values.status) ? values.status : current.status;
 
-  if (Object.keys(errors).length > 0 || fairHousing.length > 0) {
-    return {
-      status: "error",
-      message: fairHousing.length > 0 && Object.keys(errors).length === 0 ? "Edit the highlighted phrases in your description to continue." : "Please fix the highlighted fields.",
-      errors,
-      fairHousing,
-      values,
-      submittedAt: Date.now(),
-    };
-  }
+  if (Object.keys(errors).length > 0 || fairHousing.length > 0) return formErrorState(values, errors, fairHousing);
 
   const { error: updateError } = await supabase
     .from("listings")
