@@ -143,7 +143,7 @@ export async function saveVerification(formData: FormData) {
   const checks = {
     license_checked: formData.get("license_checked") === "on",
     coi_reviewed: formData.get("coi_reviewed") === "on",
-    phone_call_done: formData.get("phone_call_done") === "on",
+    contact_confirmed: formData.get("contact_confirmed") === "on",
   };
   const markVerified = formData.get("verified") === "on";
   const adminNotes = String(formData.get("admin_notes") ?? "").trim().slice(0, 5000) || null;
@@ -151,7 +151,7 @@ export async function saveVerification(formData: FormData) {
   const { data: current } = await admin.from("vendor_verifications").select("verified_at, submitted_at").eq("vendor_id", vendorId).maybeSingle();
 
   // Verification needs all three review steps done. Save the progress (boxes and notes) without changing the badge.
-  if (markVerified && !(checks.license_checked && checks.coi_reviewed && checks.phone_call_done)) {
+  if (markVerified && !(checks.license_checked && checks.coi_reviewed && checks.contact_confirmed)) {
     const { error } = await admin
       .from("vendor_verifications")
       .upsert({ vendor_id: vendorId, ...checks, admin_notes: adminNotes, verified_at: current?.verified_at ?? null }, { onConflict: "vendor_id" });

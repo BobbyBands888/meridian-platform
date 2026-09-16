@@ -52,6 +52,7 @@ Run each file in `supabase/migrations/` in filename order, once each (re-running
 10. `20260923000000_service_area.sql` (Nashville's ten-county service area, out-of-area email waitlist)
 11. `20260924000000_listing_drafts.sql` (List without signing in first: unverified listing drafts, email confirmation at submit)
 12. `20260925000000_photos_and_funnel.sql` (Up to 50 photos per listing and draft, seller funnel event log)
+13. `20260926000000_contact_confirmed.sql` (Vendor review step "Phone call done" renamed to "Contact confirmed by email")
 
 If you ever re-run an earlier file, re-run every later file after it too, since later files replace some of its functions.
 

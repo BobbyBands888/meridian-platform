@@ -88,7 +88,8 @@ type VendorVerificationRow = {
   submitted_at: string | null;
   license_checked: boolean;
   coi_reviewed: boolean;
-  phone_call_done: boolean;
+  /** The vendor replied from their business-domain email (or the email on file) confirming the account. */
+  contact_confirmed: boolean;
   admin_notes: string | null;
   verified_at: string | null;
   updated_at: string;

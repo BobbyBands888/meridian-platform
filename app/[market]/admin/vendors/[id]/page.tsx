@@ -191,12 +191,30 @@ export default async function AdminVendorPage({ params, searchParams }: PageProp
                 {[
                   { name: "license_checked", label: "License checked", checked: verification?.license_checked },
                   { name: "coi_reviewed", label: "COI reviewed", checked: verification?.coi_reviewed },
-                  { name: "phone_call_done", label: "Phone call done", checked: verification?.phone_call_done },
+                  {
+                    name: "contact_confirmed",
+                    label: "Contact confirmed by email",
+                    hint: "Check only after the vendor replies from an email at their business domain (or the email on file) confirming the account.",
+                    checked: verification?.contact_confirmed,
+                  },
                 ].map((c) => (
-                  <label key={c.name} className="flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border border-line px-4 text-[15px] has-[:checked]:border-forest">
-                    <input type="checkbox" name={c.name} defaultChecked={Boolean(c.checked)} className="h-5 w-5 accent-[#1f4d3a]" />
-                    {c.label}
-                  </label>
+                  <div key={c.name}>
+                    <label className="flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border border-line px-4 text-[15px] has-[:checked]:border-forest">
+                      <input
+                        type="checkbox"
+                        name={c.name}
+                        defaultChecked={Boolean(c.checked)}
+                        aria-describedby={c.hint ? `${c.name}-hint` : undefined}
+                        className="h-5 w-5 accent-[#1f4d3a]"
+                      />
+                      {c.label}
+                    </label>
+                    {c.hint && (
+                      <p id={`${c.name}-hint`} className="mt-1.5 px-1 text-[13px] leading-snug text-muted">
+                        {c.hint}
+                      </p>
+                    )}
+                  </div>
                 ))}
               </div>
             </fieldset>
