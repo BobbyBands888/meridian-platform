@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Container, PageHeader } from "@/components/ui";
 import { areasByCounty, marketAreas, zipPhrase } from "@/lib/areas";
 import { requireMarket } from "@/lib/market-data";
-import { countyList } from "@/lib/markets";
+import { countyList, serviceArea } from "@/lib/markets";
 
 export const revalidate = 3600;
 
@@ -11,7 +11,7 @@ export async function generateMetadata({ params }: PageProps<"/[market]/homes/ar
   const market = await requireMarket((await params).market);
   return {
     title: `${market.name} neighborhoods and towns`,
-    description: `Every neighborhood and town ${market.name} Buys covers, grouped by county, across ${countyList(market)}. Browse for-sale-by-owner homes area by area.`,
+    description: `Every neighborhood and town ${market.name} Buys covers across ${serviceArea(market, countyList(market))}, grouped by county. Browse for-sale-by-owner homes area by area.`,
     alternates: { canonical: "/homes/areas" },
   };
 }
@@ -26,7 +26,7 @@ export default async function AreasPage({ params }: PageProps<"/[market]/homes/a
     <>
       <PageHeader
         title={`${market.name} neighborhoods and towns`}
-        intro={`All ${total} areas we cover across ${countyList(market)}. Pick one to see the homes owners have listed there.`}
+        intro={`All ${total} areas we cover across ${serviceArea(market, countyList(market))}. Pick one to see the homes owners have listed there.`}
       />
       <Container className="pb-16">
         <div className="space-y-12">

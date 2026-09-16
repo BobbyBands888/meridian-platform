@@ -49,6 +49,7 @@ Run each file in `supabase/migrations/` in filename order, once each (re-running
 7. `20260920000000_markets.sql` (Phase 7: markets table, `market_id` on vendors, listings, leads, and alerts, sign-in email rate limit)
 8. `20260921000000_automation.sql` (Phase 8: alert send log, vendor email log, Facebook post log, vendor approval date and email preferences, market launch date)
 9. `20260922000000_growth.sql` (Phase 9: signup market on profiles, expressions of interest, the seven-day email course, AI description usage)
+10. `20260923000000_service_area.sql` (Nashville's ten-county service area, out-of-area email waitlist)
 
 If you ever re-run an earlier file, re-run every later file after it too, since later files replace some of its functions.
 

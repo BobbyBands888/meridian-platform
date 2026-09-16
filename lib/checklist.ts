@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { cache } from "react";
 import type { VendorCategoryValue } from "@/lib/database.types";
-import { brandName, type Market } from "@/lib/markets";
+import { brandName, serviceArea, type Market } from "@/lib/markets";
 import { vendorCategories } from "@/lib/site";
 
 export type ChecklistStep = {
@@ -93,14 +93,14 @@ export function parseChecklist(markdown: string): Checklist {
 
 /**
  * content/checklist.md is shared by every market. Placeholders fill in what differs by state:
- * {brand} "Nashville Buys", {name} "Nashville", {region} "Middle Tennessee", {state} "Tennessee",
+ * {brand} "Nashville Buys", {name} "Nashville", {region} "Greater Nashville & Middle Tennessee", {state} "Tennessee",
  * {closing} the market's closing note ("attorney or title company"), {disclosure} its disclosure note.
  */
 export function fillMarketPlaceholders(text: string, market: Market) {
   const values: Record<string, string> = {
     brand: brandName(market),
     name: market.name,
-    region: market.region,
+    region: serviceArea(market, market.region),
     state: market.state,
     closing: market.closing_note,
     disclosure: market.disclosure_note,

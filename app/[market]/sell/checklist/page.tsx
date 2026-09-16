@@ -8,6 +8,7 @@ import { VendorCard } from "@/components/vendor-card";
 import { getChecklist, type ChecklistStep } from "@/lib/checklist";
 import { getDisclosureGuidePath } from "@/lib/guides";
 import { requireMarket } from "@/lib/market-data";
+import { serviceArea } from "@/lib/markets";
 import { VENDOR_CATEGORY_LIMIT_NOTE } from "@/lib/site";
 import type { PublicVendor, VendorCategoryValue } from "@/lib/database.types";
 import { CACHE_TAGS, createPublicClient } from "@/lib/supabase/public";
@@ -23,7 +24,7 @@ export async function generateMetadata({ params }: PageProps<"/[market]/sell/che
   const steps = checklist.sections.reduce((n, s) => n + s.steps.length, 0);
   return {
     title: checklist.title || "Pre-sale checklist",
-    description: `A free ${steps}-step checklist for selling your home by owner in ${market.name} and ${market.region}, with local pros for each step. General information, not legal, financial, or pricing advice.`,
+    description: `A free ${steps}-step checklist for selling your home by owner in ${serviceArea(market, `${market.name} and ${market.region}`)}, with local pros for each step. General information, not legal, financial, or pricing advice.`,
     alternates: { canonical: "/sell/checklist" },
   };
 }

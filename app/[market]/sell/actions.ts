@@ -9,7 +9,7 @@ import { sendAdminDescriptionEdit, sendAdminNewListing, sendListingReceived } fr
 import { DESCRIPTION_MAX, DESCRIPTION_MIN, LISTING_PHOTO_MAX } from "@/lib/listings";
 import { cityForZip, isServiceZip } from "@/lib/areas";
 import { getMarketById, getRequestMarket } from "@/lib/market-data";
-import { countyList, isLive } from "@/lib/markets";
+import { countyList, isLive, serviceArea } from "@/lib/markets";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CACHE_TAGS } from "@/lib/supabase/public";
 import { createClient } from "@/lib/supabase/server";
@@ -101,7 +101,7 @@ export async function createListing(_prev: ListingFormState, formData: FormData)
   const market = await getRequestMarket();
   if (!isLive(market)) redirect("/");
   if (values.street.length < 3 || values.street.length > 160 || !/\d/.test(values.street)) errors.street = "Enter the street address, like 1234 Main St.";
-  if (!isServiceZip(market, values.zip)) errors.zip = `Choose a ZIP code in ${countyList(market, "or")}.`;
+  if (!isServiceZip(market, values.zip)) errors.zip = `Choose a ZIP code in ${serviceArea(market, countyList(market, "or"))}.`;
   const beds = Number(values.beds);
   if (!Number.isInteger(beds) || beds < 0 || beds > 20) errors.beds = "Enter the number of bedrooms.";
   const baths = Number(values.baths);

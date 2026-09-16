@@ -1,9 +1,19 @@
 import type { MarketZipData, ZipInfo } from "./types";
 
-// Residential ZIP codes Nashville Buys serves across Middle Tennessee: Davidson, Williamson, Rutherford, Sumner,
-// and Wilson counties. Each has the mailing city and a common area name. Area names are approximate (ZIP lines
-// don't follow neighborhood lines), and a few ZIPs cross county lines; `county` is the primary one.
-// PO-box-only and single-business ZIPs are left out.
+// Residential ZIP codes Nashville Buys serves across Greater Nashville & Middle Tennessee: Davidson, Williamson,
+// Rutherford, Sumner, Wilson, Maury, Montgomery, Robertson, Cheatham, and Dickson counties. Each has the mailing city
+// and a common area name. Area names are approximate (ZIP lines don't follow neighborhood lines), and a few ZIPs cross
+// county lines; `county` is the primary one among the counties we cover. PO-box-only and single-business ZIPs are
+// left out.
+//
+// Maury, Montgomery, Robertson, Cheatham, and Dickson (added 2026-09-16) come from the US Census Bureau 2020 ZCTA to
+// County Relationship File (tab20_zcta520_county20_natl.txt, www2.census.gov/geo/docs/maps-data/data/rel2020/zcta520/,
+// downloaded 2026-09-16). A ZIP is included when at least 10% of its land area is in one of those counties. Mailing
+// city names are from the GeoNames US postal code file (download.geonames.org/export/zip/, same date).
+// Left out: 42223 Fort Campbell (Army post housing, Kentucky mailing address), and ZIPs with under 2% of their land in
+// a new county: 37061 Erin, 37091 Lewisburg, 38483 Summertown.
+// Census land shares moved two existing ZIPs: 37174 Spring Hill is 75% Maury (25% Williamson), and 37188 White House
+// is 73% Robertson (27% Sumner). 37146 Pleasant View is 54% Robertson by land but the town is in Cheatham County.
 
 const z = (city: string, county: string, area = city): ZipInfo => ({ city, area, county });
 
@@ -47,7 +57,6 @@ const zips: Record<string, ZipInfo> = {
   "37067": z("Franklin", "Williamson", "Cool Springs"),
   "37069": z("Franklin", "Williamson"),
   "37135": z("Nolensville", "Williamson"),
-  "37174": z("Spring Hill", "Williamson"),
   "37179": z("Thompson's Station", "Williamson"),
 
   // Rutherford County
@@ -72,16 +81,62 @@ const zips: Record<string, ZipInfo> = {
   "37075": z("Hendersonville", "Sumner"),
   "37148": z("Portland", "Sumner"),
   "37186": z("Westmoreland", "Sumner"),
-  "37188": z("White House", "Sumner"),
 
   // Wilson County
   "37087": z("Lebanon", "Wilson"),
   "37090": z("Lebanon", "Wilson"),
   "37122": z("Mt. Juliet", "Wilson"),
   "37184": z("Watertown", "Wilson"),
+
+  // Maury County
+  "37174": z("Spring Hill", "Maury"), // 25% Williamson
+  "38401": z("Columbia", "Maury"),
+  "38451": z("Culleoka", "Maury"),
+  "38461": z("Hampshire", "Maury"), // 42% Maury, mostly Lewis
+  "38474": z("Mount Pleasant", "Maury"),
+  "38476": z("Primm Springs", "Maury"), // 17% Maury, mostly Hickman
+  "38482": z("Santa Fe", "Maury"),
+  "38487": z("Williamsport", "Maury"),
+
+  // Montgomery County
+  "37040": z("Clarksville", "Montgomery"),
+  "37042": z("Clarksville", "Montgomery"),
+  "37043": z("Clarksville", "Montgomery"),
+  "37050": z("Cumberland City", "Montgomery"), // 22% Montgomery, mostly Stewart
+  "37052": z("Cunningham", "Montgomery"),
+  "37079": z("Indian Mound", "Montgomery"), // 20% Montgomery, mostly Stewart
+  "37142": z("Palmyra", "Montgomery"),
+  "37171": z("Southside", "Montgomery"),
+  "37191": z("Woodlawn", "Montgomery"),
+
+  // Robertson County
+  "37010": z("Adams", "Robertson"), // 39% Montgomery
+  "37032": z("Cedar Hill", "Robertson"),
+  "37049": z("Cross Plains", "Robertson"),
+  "37073": z("Greenbrier", "Robertson"),
+  "37141": z("Orlinda", "Robertson"),
+  "37172": z("Springfield", "Robertson"),
+  "37188": z("White House", "Robertson"), // 27% Sumner
+
+  // Cheatham County
+  "37015": z("Ashland City", "Cheatham"),
+  "37035": z("Chapmansboro", "Cheatham"),
+  "37082": z("Kingston Springs", "Cheatham"),
+  "37143": z("Pegram", "Cheatham"),
+  "37146": z("Pleasant View", "Cheatham"), // 54% Robertson
+
+  // Dickson County
+  "37025": z("Bon Aqua", "Dickson"), // 24% Dickson, mostly Hickman
+  "37029": z("Burns", "Dickson"),
+  "37036": z("Charlotte", "Dickson"),
+  "37051": z("Cumberland Furnace", "Dickson"), // 24% Montgomery
+  "37055": z("Dickson", "Dickson"),
+  "37165": z("Slayden", "Dickson"),
+  "37181": z("Vanleer", "Dickson"),
+  "37187": z("White Bluff", "Dickson"), // 22% Cheatham
 };
 
 export const nashville: MarketZipData = {
-  counties: ["Davidson", "Williamson", "Rutherford", "Sumner", "Wilson"],
+  counties: ["Davidson", "Williamson", "Rutherford", "Sumner", "Wilson", "Maury", "Montgomery", "Robertson", "Cheatham", "Dickson"],
   zips,
 };

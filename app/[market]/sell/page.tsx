@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { AreaWaitlistForm } from "@/components/area-waitlist-form";
 import { Check } from "@/components/photo-card";
 import { ButtonLink, Container } from "@/components/ui";
 import { zipGroups } from "@/lib/areas";
 import { getCurrentProfile, getCurrentUser, isProfileComplete } from "@/lib/auth";
 import { getDisclosureGuidePath } from "@/lib/guides";
 import { requireMarket } from "@/lib/market-data";
-import { brandName, countyList } from "@/lib/markets";
+import { brandName, countyList, serviceArea } from "@/lib/markets";
 import { createListing } from "./actions";
 import { ListingForm } from "./listing-form";
 
@@ -15,7 +16,7 @@ export async function generateMetadata({ params }: PageProps<"/[market]/sell">):
   const market = await requireMarket((await params).market);
   return {
     title: `Sell your ${market.name} home by owner`,
-    description: `List your home for sale by owner in ${market.name} and across ${market.region}. Free to list, and buyers contact you directly.`,
+    description: `List your home for sale by owner across ${serviceArea(market, `${market.name} and ${market.region}`)}. Free to list, and buyers contact you directly.`,
     alternates: { canonical: "/sell" },
   };
 }
@@ -44,7 +45,7 @@ export default async function SellPage({ params }: PageProps<"/[market]/sell">) 
       <div className="mx-auto max-w-2xl">
         <h1 className="text-4xl font-bold leading-[1.1] tracking-tight sm:text-5xl">Sell your {market.name} home, direct.</h1>
         <p className="mt-4 text-lg leading-relaxed text-muted">
-          List your home free and hear from buyers yourself, anywhere in {countyList(market, "or")}. You stay in charge of pricing,
+          List your home free and hear from buyers yourself, anywhere in {serviceArea(market, countyList(market, "or"))}. You stay in charge of pricing,
           showings, and who you hire to close.
         </p>
         <ul className="mt-6 grid gap-2 sm:grid-cols-2">
@@ -86,6 +87,19 @@ export default async function SellPage({ params }: PageProps<"/[market]/sell">) 
             </ButtonLink>
           </div>
         )}
+
+        <section id="outside-area" aria-labelledby="outside-area-heading" className="mt-12 scroll-mt-24 rounded-2xl bg-surface px-6 py-8 sm:px-8">
+          <h2 id="outside-area-heading" className="text-xl font-semibold tracking-tight">
+            Not in our area yet?
+          </h2>
+          <p className="mt-2 text-[15px] leading-relaxed text-muted">
+            We list homes in {countyList(market)}. If yours is somewhere else, leave your email and ZIP and we&apos;ll tell you
+            when {brandName(market)} reaches it.
+          </p>
+          <div className="mt-5">
+            <AreaWaitlistForm source="/sell" defaultEmail={user?.email} />
+          </div>
+        </section>
       </div>
     </Container>
   );

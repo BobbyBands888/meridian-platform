@@ -6,7 +6,7 @@ import { ListingAlertsForm } from "@/components/listing-alerts-form";
 import { ListingCard } from "@/components/listing-card";
 import { zipGroups, zipsForSearch } from "@/lib/areas";
 import { requireMarket } from "@/lib/market-data";
-import { countyList } from "@/lib/markets";
+import { countyList, serviceArea } from "@/lib/markets";
 import { getActiveListings, type ListingFilters } from "@/lib/public-listings";
 import { HomeFilters } from "./home-filters";
 
@@ -14,7 +14,7 @@ export async function generateMetadata({ params }: PageProps<"/[market]/homes">)
   const market = await requireMarket((await params).market);
   return {
     title: `${market.name} homes for sale by owner`,
-    description: `Browse for-sale-by-owner homes in ${market.name} and ${market.region}, across ${countyList(market)}. Filter by price, beds, baths, and ZIP, and contact sellers directly.`,
+    description: `Browse for-sale-by-owner homes in ${serviceArea(market, `${market.name} and ${market.region}, across ${countyList(market)}`)}. Filter by price, beds, baths, and ZIP, and contact sellers directly.`,
     alternates: { canonical: "/homes" },
   };
 }
@@ -52,7 +52,7 @@ export default async function HomesPage({ params: routeParams, searchParams }: P
 
   return (
     <>
-      <PageHeader title={`${market.name} homes for sale by owner`} intro={`Every home here is listed by its owner, across ${market.name} and ${market.region}. Reach sellers directly.`} />
+      <PageHeader title={`${market.name} homes for sale by owner`} intro={`Every home here is listed by its owner, across ${serviceArea(market, `${market.name} and ${market.region}`)}. Reach sellers directly.`} />
       <Container>
         <HomeFilters zipGroups={zipGroups(market)} values={{ q, zip, min_price: str(params.min_price), max_price: str(params.max_price), beds: str(params.beds), baths: str(params.baths) }} />
 

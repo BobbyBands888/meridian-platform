@@ -1,12 +1,13 @@
 ---
 title: How to price your Nashville home without a realtor
 seoTitle: How to Price Your Nashville Home Without a Realtor (2026 Guide)
-description: A step-by-step way to find your own comps, read the Nashville market, and set a list price for a for-sale-by-owner home in Davidson, Williamson, Rutherford, Sumner, or Wilson County — no agent required.
+description: A step-by-step way to find your own comps, read the Nashville market, and set a list price for a for-sale-by-owner home anywhere in Greater Nashville & Middle Tennessee — no agent required.
 publishedAt: 2026-09-15
+updatedAt: 2026-09-16
 vendorCategories: [home_inspector, attorney]
 ---
 
-*This guide is general information for Middle Tennessee, not legal, financial, tax, or pricing advice, and not a substitute for your own attorney, appraiser, or tax professional. Laws, fees, and market conditions change; verify anything that matters to your sale with a licensed professional before relying on it.*
+*This guide is general information for Greater Nashville & Middle Tennessee, not legal, financial, tax, or pricing advice, and not a substitute for your own attorney, appraiser, or tax professional. Laws, fees, and market conditions change; verify anything that matters to your sale with a licensed professional before relying on it.*
 
 Pricing is the decision that decides everything else. Price a Nashville home right and it draws showings in the first two weeks, when a listing gets the most attention it will ever get. Price it 5% high and it sits, buyers assume something's wrong, and the eventual sale is often lower than a correct price would have brought on day one.
 
@@ -29,7 +30,7 @@ Three to five comps that meet those rules beat any algorithm.
 ### Where to find sold prices in Nashville
 
 - **Zillow or Redfin, "Sold" filter.** Set the map to your neighborhood, filter to sold in the last 6 months, and read the actual closed prices, not the estimates. Both sites show sold data pulled from public records.
-- **Davidson County Property Assessor** (padctn.org). Search by address to see the last sale price and date on any property, plus the assessed square footage. Williamson, Rutherford, Sumner, and Wilson counties have their own assessor sites with the same data.
+- **Davidson County Property Assessor** (padctn.org). Search by address to see the last sale price and date on any property, plus the assessed square footage. Every other county we cover (Williamson, Rutherford, Sumner, Wilson, Maury, Montgomery, Robertson, Cheatham, and Dickson) has its own assessor site with the same data.
 - **Realtor.com "Recently Sold."** A third source to cross-check.
 
 Write each comp on one line: address, sale date, sold price, square feet, beds/baths, and one note on condition if you can tell from the old listing photos ("renovated kitchen," "original 1970s baths").

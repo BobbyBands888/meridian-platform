@@ -1,4 +1,5 @@
 import type { Market } from "@/lib/markets";
+import { marketAreaContent, type AreaContent } from "@/lib/markets/area-content";
 import { marketZips, type MarketZipData, type ZipInfo } from "@/lib/markets/zips";
 
 export type { ZipInfo } from "@/lib/markets/zips";
@@ -84,6 +85,17 @@ export function marketAreas(market: AreaMarket): Area[] {
 
 export function areaBySlug(market: AreaMarket, slug: string): Area | undefined {
   return marketAreas(market).find((a) => a.slug === slug);
+}
+
+/** Written content for an area page, if the market has any for it. */
+export function areaContent(market: AreaMarket, area: Area): AreaContent | undefined {
+  return marketAreaContent[market.slug]?.pages[area.slug];
+}
+
+/** Whether an area page belongs in search: it has written content, or its county doesn't require any. */
+export function isAreaIndexable(market: AreaMarket, area: Area) {
+  const content = marketAreaContent[market.slug];
+  return !content || Boolean(content.pages[area.slug]) || !content.contentRequiredCounties.includes(area.county);
 }
 
 /** Areas grouped by county, in the market's county order, for the "All areas" page. */

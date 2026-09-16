@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import { ButtonLink, Container } from "@/components/ui";
 import { requireMarket } from "@/lib/market-data";
-import { brandName, COMPANY, isLive } from "@/lib/markets";
+import { brandName, COMPANY, isLive, serviceArea } from "@/lib/markets";
 
 export async function generateMetadata({ params }: PageProps<"/[market]/about">): Promise<Metadata> {
   const market = await requireMarket((await params).market);
   return {
     title: "About",
-    description: `Why ${brandName(market)} exists: one free place for ${market.region} owners to sell direct, buyers to reach them, and both to find local pros.`,
+    description: `Why ${brandName(market)} exists: one free place for ${serviceArea(market, market.region)} owners to sell direct, buyers to reach them, and both to find local pros.`,
     alternates: { canonical: "/about" },
   };
 }
@@ -24,7 +24,7 @@ export default async function AboutPage({ params }: PageProps<"/[market]/about">
         <div className="mt-8 space-y-5 text-[18px] leading-[1.75]">
           <p>Hi, I&apos;m Bobby.</p>
           <p>
-            I started {brand} because selling a home yourself in {market.region} is harder to figure out than it should
+            I started {brand} because selling a home yourself in {serviceArea(market, market.region)} is harder to figure out than it should
             be. The information is scattered, the paperwork is unfamiliar, and it&apos;s hard to know which local pros to call.
           </p>
           <p>

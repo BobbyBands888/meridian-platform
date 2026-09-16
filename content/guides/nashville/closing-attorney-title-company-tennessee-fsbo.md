@@ -6,7 +6,7 @@ publishedAt: 2026-09-15
 vendorCategories: [attorney]
 ---
 
-*This guide is general information for Middle Tennessee, not legal, financial, tax, or pricing advice, and not a substitute for your own attorney, appraiser, or tax professional. Laws, fees, and market conditions change; verify anything that matters to your sale with a licensed professional before relying on it.*
+*This guide is general information for Greater Nashville & Middle Tennessee, not legal, financial, tax, or pricing advice, and not a substitute for your own attorney, appraiser, or tax professional. Laws, fees, and market conditions change; verify anything that matters to your sale with a licensed professional before relying on it.*
 
 The question every FSBO seller in Nashville eventually asks: "Okay, we have a buyer. Now who does the actual closing?"
 

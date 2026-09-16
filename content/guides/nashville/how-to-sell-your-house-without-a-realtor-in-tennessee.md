@@ -1,7 +1,7 @@
 ---
 title: How to sell your house without a realtor in Tennessee
 seoTitle: How to Sell Your House Without a Realtor in Tennessee (FSBO Guide)
-description: A plain-language walkthrough of selling a home by owner in Nashville and Middle Tennessee, from getting ready and disclosures to offers, contracts, and closing.
+description: A plain-language walkthrough of selling a home by owner in Greater Nashville & Middle Tennessee, from getting ready and disclosures to offers, contracts, and closing.
 publishedAt: 2026-09-15
 vendorCategories: [attorney, home_inspector, photographer, lender]
 ---

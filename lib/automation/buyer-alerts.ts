@@ -4,7 +4,7 @@ import { sendEmailBatch, type EmailArgs } from "@/lib/email";
 import { alertAreaLabel, alertUnsubscribe } from "@/lib/listing-alerts";
 import { formatPrice } from "@/lib/listings";
 import { getMarketById } from "@/lib/market-data";
-import { brandName, type Market } from "@/lib/markets";
+import { brandName, serviceArea, type Market } from "@/lib/markets";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { listingCardBlock, loadListingsForCards, type ListingForCard } from "./listing-card";
 import { localDate } from "./time";
@@ -43,7 +43,7 @@ export function alertMatches(market: Market, alertZip: string | null, listingZip
 }
 
 function matchReason(market: Market, alertZip: string | null, listingZip: string) {
-  if (!alertZip) return `your alert for all of ${market.region}`;
+  if (!alertZip) return `your alert for all of ${serviceArea(market, market.region)}`;
   if (alertZip === listingZip) return `your alert for ZIP ${alertAreaLabel(market, alertZip)}`;
   return `your alert for ZIP ${alertAreaLabel(market, alertZip)}, since it's in ${zipInfo(market, listingZip)?.county} County`;
 }

@@ -60,7 +60,7 @@ export function ListingForm({ mode, userId, listingId, action, initial, statusOp
           <Field id="street" label="Street address" error={errors.street}>
             <input id="street" name="street" type="text" required autoComplete="address-line1" placeholder="1234 Main St" defaultValue={values.street} className={inputClass} aria-invalid={Boolean(errors.street) || undefined} />
           </Field>
-          <Field id="zip" label="ZIP code" error={errors.zip}>
+          <Field id="zip" label="ZIP code" hint="Don't see your ZIP? We may not cover your area yet. Leave your email below and we'll let you know." error={errors.zip}>
             <select id="zip" name="zip" required defaultValue={values.zip} className={`${inputClass} bg-white`} aria-invalid={Boolean(errors.zip) || undefined}>
               <option value="" disabled>
                 Choose a ZIP code

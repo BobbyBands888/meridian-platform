@@ -6,7 +6,7 @@ publishedAt: 2026-09-15
 vendorCategories: [lender]
 ---
 
-*This guide is general information for Middle Tennessee, not legal, financial, tax, or pricing advice, and not a substitute for your own attorney, appraiser, or tax professional. Laws, fees, and market conditions change; verify anything that matters to your sale with a licensed professional before relying on it.*
+*This guide is general information for Greater Nashville & Middle Tennessee, not legal, financial, tax, or pricing advice, and not a substitute for your own attorney, appraiser, or tax professional. Laws, fees, and market conditions change; verify anything that matters to your sale with a licensed professional before relying on it.*
 
 Every FSBO seller has the same moment of doubt: a stranger texts about the listing, and you realize you're about to let them into your house with no agent, no lockbox, and no one else there. Agents deal with this by doing it hundreds of times. You can deal with it by setting rules before the first message arrives and never bending them.
 

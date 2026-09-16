@@ -5,7 +5,7 @@ import { Container } from "@/components/ui";
 import { getChecklist } from "@/lib/checklist";
 import { COURSE_DAYS } from "@/lib/course";
 import { requireLiveMarket } from "@/lib/market-data";
-import { brandName, countyList } from "@/lib/markets";
+import { brandName, countyList, serviceArea } from "@/lib/markets";
 
 export const revalidate = 3600;
 
@@ -30,7 +30,7 @@ export default async function CoursePage({ params }: PageProps<"/[market]/sell/c
           Selling without an agent in {market.name}, one email a day for a week
         </h1>
         <p className="mt-4 text-lg leading-relaxed text-muted">
-          Seven emails, one a day, that walk through selling your own home across {countyList(market, "or")} — from working out
+          Seven emails, one a day, that walk through selling your own home across {serviceArea(market, countyList(market, "or"))} — from working out
           your number to what happens at the closing table. Free, and it ends after a week.
         </p>
 

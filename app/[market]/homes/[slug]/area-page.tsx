@@ -4,7 +4,7 @@ import { ListingAlertsForm } from "@/components/listing-alerts-form";
 import { ListingCard } from "@/components/listing-card";
 import { CardGrid } from "@/components/photo-card";
 import { ButtonLink, Container, EmptyState } from "@/components/ui";
-import { zipPhrase, type Area } from "@/lib/areas";
+import { areaContent, isAreaIndexable, zipPhrase, type Area } from "@/lib/areas";
 import { getGuides } from "@/lib/guides";
 import { brandName, type Market } from "@/lib/markets";
 import { getActiveListings } from "@/lib/public-listings";
@@ -30,6 +30,7 @@ export function areaMetadata(market: Market, area: Area): Metadata {
     title,
     description: `For-sale-by-owner homes in ${area.name}, ${area.city}, ${market.state_code} (${zipPhrase(area.zips)}). Browse FSBO listings and contact sellers directly on ${brandName(market)}.`,
     alternates: { canonical: `/homes/${area.slug}` },
+    robots: isAreaIndexable(market, area) ? undefined : { index: false },
     openGraph: { type: "website", title, url: `/homes/${area.slug}`, siteName: brandName(market) },
   };
 }
@@ -37,6 +38,7 @@ export function areaMetadata(market: Market, area: Area): Metadata {
 export async function AreaPage({ market, area }: { market: Market; area: Area }) {
   const [listings, guides] = await Promise.all([getActiveListings(market.id, { zips: area.zips }), getGuides(market.slug)]);
   const [where, what] = intro(market, area);
+  const content = areaContent(market, area);
   const zipOptions = area.zips.map((zip) => ({ zip, label: `${zip} · ${area.name}` }));
 
   return (
@@ -59,6 +61,18 @@ export async function AreaPage({ market, area }: { market: Market; area: Area })
       <p className="mt-4 max-w-2xl text-lg leading-relaxed text-muted">
         {where} {what}
       </p>
+      {content && (
+        <section aria-labelledby="area-about-heading" className="mt-10 max-w-3xl">
+          <h2 id="area-about-heading" className="text-2xl font-bold tracking-tight">
+            About {area.name}
+          </h2>
+          <div className="mt-4 space-y-4 text-[17px] leading-[1.75]">
+            {content.paragraphs.map((p) => (
+              <p key={p}>{p}</p>
+            ))}
+          </div>
+        </section>
+      )}
 
       <div className="mt-10">
         {listings.length > 0 ? (

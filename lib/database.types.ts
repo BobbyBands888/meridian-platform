@@ -180,6 +180,15 @@ type CourseSignupRow = {
   unsubscribed_at: string | null;
 };
 
+type AreaWaitlistRow = {
+  id: string;
+  email: string;
+  market_id: string;
+  zip: string;
+  source: string | null;
+  created_at: string;
+};
+
 type CourseEmailRow = {
   id: string;
   signup_id: string;
@@ -263,6 +272,12 @@ export type Database = {
         Relationships: [
           { foreignKeyName: "course_emails_signup_id_fkey"; columns: ["signup_id"]; isOneToOne: false; referencedRelation: "course_signups"; referencedColumns: ["id"] },
         ];
+      };
+      area_waitlist: {
+        Row: AreaWaitlistRow;
+        Insert: Pick<AreaWaitlistRow, "email" | "market_id" | "zip"> & Partial<AreaWaitlistRow>;
+        Update: Partial<AreaWaitlistRow>;
+        Relationships: [];
       };
       listing_ai_usage: {
         Row: ListingAiUsageRow;

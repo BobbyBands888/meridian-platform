@@ -8,7 +8,7 @@ import { SearchBar } from "@/components/search-bar";
 import { ButtonLink, Container } from "@/components/ui";
 import { getGuides } from "@/lib/guides";
 import { requireMarket } from "@/lib/market-data";
-import { brandName, isLive, marketTagline, type Market } from "@/lib/markets";
+import { brandName, isLive, marketTagline, serviceArea, type Market } from "@/lib/markets";
 import { getActiveListings } from "@/lib/public-listings";
 import { getActiveVendorCategories } from "@/lib/public-vendors";
 import { VENDOR_CATEGORY_LIMIT_NOTE } from "@/lib/site";
@@ -111,7 +111,7 @@ export default async function HomePage({ params }: PageProps<"/[market]">) {
               Get new {market.name} FSBO listings by email
             </h2>
             <p className="mt-3 max-w-2xl text-[17px] leading-relaxed text-muted">
-              Hear when owners list new homes. Add a ZIP to focus on one area, or leave it blank for all of {market.region}.
+              Hear when owners list new homes. Add a ZIP to focus on one area, or leave it blank for all of {serviceArea(market, market.region)}.
             </p>
             <div className="mt-6 max-w-3xl">
               <ListingAlertsForm />

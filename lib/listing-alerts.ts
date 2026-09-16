@@ -1,7 +1,7 @@
 import "server-only";
 import { areaForZip } from "@/lib/areas";
 import { sendEmail, siteLink, type Unsubscribe } from "@/lib/email";
-import { brandName, type Market } from "@/lib/markets";
+import { brandName, serviceArea, type Market } from "@/lib/markets";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -41,7 +41,7 @@ export function sendAlertConfirmation(market: Market, { email, zip, token }: { e
         kind: "p",
         text: area
           ? `We'll email you when new for-sale-by-owner homes are listed on ${brand}, starting with ZIP ${area}.`
-          : `We'll email you when new for-sale-by-owner homes are listed on ${brand} across ${market.name} and ${market.region}.`,
+          : `We'll email you when new for-sale-by-owner homes are listed on ${brand} across ${serviceArea(market, `${market.name} and ${market.region}`)}.`,
       },
       market.status === "live"
         ? { kind: "button", label: "Browse homes now", href: siteLink(market, zip ? `/homes?zip=${zip}` : "/homes") }

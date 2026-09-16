@@ -3,13 +3,14 @@ import Link from "next/link";
 import { ButtonLink, Container, EmptyState, PageHeader } from "@/components/ui";
 import { formatGuideDate, getGuides } from "@/lib/guides";
 import { requireMarket } from "@/lib/market-data";
+import { serviceArea } from "@/lib/markets";
 
 export async function generateMetadata({ params }: PageProps<"/[market]/guides">): Promise<Metadata> {
   const market = await requireMarket((await params).market);
   const guides = await getGuides(market.slug);
   return {
     title: `Guides for buying and selling direct in ${market.name}`,
-    description: `Plain-language guides for ${market.name} and ${market.region} home sellers and buyers, from selling without a realtor to ${market.state}'s disclosure rules. General information, not legal advice.`,
+    description: `Plain-language guides for ${serviceArea(market, `${market.name} and ${market.region}`)} home sellers and buyers, from selling without a realtor to ${market.state}'s disclosure rules. General information, not legal advice.`,
     alternates: { canonical: "/guides" },
     robots: guides.length > 0 ? undefined : { index: false },
   };
@@ -23,7 +24,7 @@ export default async function GuidesPage({ params }: PageProps<"/[market]/guides
     <>
       <PageHeader
         title="Guides"
-        intro={`Plain-language guides for buying and selling a home direct in ${market.name} and ${market.region}. General information, not legal advice.`}
+        intro={`Plain-language guides for buying and selling a home direct in ${serviceArea(market, `${market.name} and ${market.region}`)}. General information, not legal advice.`}
       />
       <Container>
         {guides.length > 0 ? (

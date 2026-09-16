@@ -61,11 +61,19 @@ export function marketDisclaimer(market: Pick<Market, "name">) {
   return `${brandName(market)} connects buyers, sellers, and professionals directly. We are not a broker, do not hold funds, and do not facilitate closings. All parties should hire independent legal counsel.`;
 }
 
-export function marketDescription(market: Pick<Market, "name" | "state_code" | "status">) {
+export function marketDescription(market: Pick<Market, "slug" | "name" | "state_code" | "status">) {
   return market.status === "live"
-    ? `${brandName(market)} is a free for-sale-by-owner listing hub for ${market.name}, ${market.state_code}, with a directory of vetted local vendors. Buyers and sellers connect directly.`
+    ? `${brandName(market)} is a free for-sale-by-owner listing hub for ${serviceArea(market, `${market.name}, ${market.state_code}`)}, with a directory of vetted local vendors. Buyers and sellers connect directly.`
     : `${brandName(market)} is launching soon: free listings for selling without an agent in ${market.name}, ${market.state_code}, plus vetted local pros.`;
 }
+
+/** What copy calls a market's whole service area, where it has a name wider than its city and region. */
+const SERVICE_AREA_NAMES: Record<string, string> = {
+  nashville: "Greater Nashville & Middle Tennessee",
+};
+
+/** "Greater Nashville & Middle Tennessee", or `fallback` for markets without a service area name. */
+export const serviceArea = (market: Pick<Market, "slug">, fallback: string) => SERVICE_AREA_NAMES[market.slug] ?? fallback;
 
 /** "Davidson, Williamson, and Wilson counties" */
 export function countyList(market: Pick<Market, "counties">, conjunction = "and") {
