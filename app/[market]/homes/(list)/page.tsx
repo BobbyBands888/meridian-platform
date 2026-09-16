@@ -4,7 +4,7 @@ import { CardGrid } from "@/components/photo-card";
 import { ButtonLink, Container, EmptyState, PageHeader } from "@/components/ui";
 import { ListingAlertsForm } from "@/components/listing-alerts-form";
 import { ListingCard } from "@/components/listing-card";
-import { zipGroups, zipsForSearch } from "@/lib/areas";
+import { zipDirectory, zipGroups, zipsForSearch } from "@/lib/areas";
 import { requireMarket } from "@/lib/market-data";
 import { countyList, serviceArea } from "@/lib/markets";
 import { getActiveListings, type ListingFilters } from "@/lib/public-listings";
@@ -90,7 +90,7 @@ export default async function HomesPage({ params: routeParams, searchParams }: P
                   Get new {market.name} FSBO listings by email
                 </h3>
                 <p className="mb-4 mt-1 text-[15px] leading-relaxed text-muted">We&apos;ll let you know when owners list new homes.</p>
-                <ListingAlertsForm defaultZip={alertZip} />
+                <ListingAlertsForm zipDirectory={zipDirectory(market)} defaultZip={alertZip} />
               </section>
             }
           >

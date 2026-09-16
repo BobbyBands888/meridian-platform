@@ -112,6 +112,19 @@ export function zipPhrase(zips: string[]) {
   return `ZIPs ${zips.slice(0, -1).join(", ")}${zips.length > 2 ? "," : ""} and ${zips.at(-1)}`;
 }
 
+/** Why a listing can't use this ZIP, or undefined when the market serves it. */
+export function listingZipError(market: AreaMarket, zip: string) {
+  if (!/^\d{5}$/.test(zip)) return "Enter a 5-digit ZIP code.";
+  if (!isServiceZip(market, zip)) return `We don't serve ZIP ${zip} yet.`;
+}
+
+/** Town and county by ZIP, for checking a typed ZIP in the browser. */
+export type ZipDirectory = Record<string, { town: string; county: string }>;
+
+export function zipDirectory(market: AreaMarket): ZipDirectory {
+  return Object.fromEntries(Object.entries(dataFor(market).zips).map(([zip, info]) => [zip, { town: info.city, county: info.county }]));
+}
+
 export type ZipGroup = { county: string; options: { zip: string; label: string }[] };
 
 /** ZIP options grouped by county, for select menus. */

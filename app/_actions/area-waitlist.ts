@@ -25,7 +25,7 @@ export async function joinAreaWaitlist(_prev: AreaWaitlistState, formData: FormD
   const errors: AreaWaitlistState["errors"] = {};
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) errors.email = "Enter a valid email address.";
   if (!/^\d{5}$/.test(zip)) errors.zip = "Enter your home's 5-digit ZIP.";
-  else if (isServiceZip(market, zip)) errors.zip = `Good news: we already cover ${zip}, so you can list your home here.`;
+  else if (isServiceZip(market, zip)) errors.zip = `Good news: we already serve ZIP ${zip}.`;
   if (Object.keys(errors).length > 0) {
     return { status: "error", message: "Please fix the highlighted fields.", errors, values };
   }
@@ -43,5 +43,5 @@ export async function joinAreaWaitlist(_prev: AreaWaitlistState, formData: FormD
     return { status: "error", message: "We couldn't save your email. Please try again.", values };
   }
 
-  return { status: "saved", message: `Thanks. We'll email ${email} when we start covering ${zip}.` };
+  return { status: "saved", message: `Thanks — we'll email you when we expand to ${zip}.` };
 }

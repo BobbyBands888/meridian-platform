@@ -4,7 +4,6 @@ import { headers } from "next/headers";
 import { isServiceZip } from "@/lib/areas";
 import { sendAlertConfirmation } from "@/lib/listing-alerts";
 import { getRequestMarket } from "@/lib/market-data";
-import { serviceArea } from "@/lib/markets";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyTurnstile } from "@/lib/turnstile";
 
@@ -24,8 +23,8 @@ export async function subscribeToListingAlerts(_prev: AlertSignupState, formData
   const market = await getRequestMarket();
   const errors: AlertSignupState["errors"] = {};
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) errors.email = "Enter a valid email address.";
-  if (zip && !/^\d{5}$/.test(zip)) errors.zip = "Enter a 5-digit ZIP, or leave it blank.";
-  else if (zip && !isServiceZip(market, zip)) errors.zip = `That ZIP is outside the ${serviceArea(market, market.region)} area we cover. Leave it blank to hear about every new home.`;
+  if (zip && !/^\d{5}$/.test(zip)) errors.zip = "Enter a 5-digit ZIP code, or leave it blank.";
+  else if (zip && !isServiceZip(market, zip)) errors.zip = `We don't serve ZIP ${zip} yet.`;
   if (Object.keys(errors).length > 0) {
     return { status: "error", message: "Please fix the highlighted fields.", errors, values };
   }

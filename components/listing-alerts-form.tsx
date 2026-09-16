@@ -5,19 +5,21 @@ import { subscribeToListingAlerts, type AlertSignupState } from "@/app/_actions/
 import { Check } from "@/components/photo-card";
 import { Turnstile, type TurnstileHandle } from "@/components/turnstile";
 import { Button } from "@/components/ui";
+import { useZipCheck, ZipFeedback } from "@/components/zip-field";
+import type { ZipDirectory } from "@/lib/areas";
 
 type Props = {
+  /** The market's ZIP codes, so a typed ZIP gets its town and county (or a "not yet" note) right away. */
+  zipDirectory: ZipDirectory;
   defaultZip?: string;
   submitLabel?: string;
-  /** When set, the ZIP field becomes a menu of these ZIPs, for a page about one area. */
-  zipOptions?: { zip: string; label: string }[];
 };
 
 /**
  * Email + optional ZIP signup for new-listing alerts. Turnstile's script loads only once someone starts using the
  * form, so pages that show it (like the home page) don't pay for it on every visit.
  */
-export function ListingAlertsForm({ defaultZip = "", submitLabel = "Get listing alerts", zipOptions }: Props) {
+export function ListingAlertsForm({ zipDirectory, defaultZip = "", submitLabel = "Get listing alerts" }: Props) {
   const [state, formAction, pending] = useActionState<AlertSignupState, FormData>(subscribeToListingAlerts, {});
   const [armed, setArmed] = useState(false);
   const [waiting, setWaiting] = useState(false);
@@ -29,6 +31,9 @@ export function ListingAlertsForm({ defaultZip = "", submitLabel = "Get listing 
   const id = useId();
   const errors = state.errors ?? {};
   const values = state.values;
+  const zipCheck = useZipCheck(zipDirectory, defaultZip);
+  // A server error about the ZIP applies only until the ZIP is changed.
+  const zipError = errors.zip && zipCheck.zip === values?.zip ? errors.zip : undefined;
 
   const onToken = useCallback(
     (t: string) => {
@@ -113,51 +118,30 @@ export function ListingAlertsForm({ defaultZip = "", submitLabel = "Get listing 
             </p>
           )}
         </div>
-        <div className={zipOptions ? "sm:w-56" : "sm:w-40"}>
+        <div className="sm:w-40">
           <label htmlFor={`${id}-zip`} className="sr-only">
             ZIP code (optional)
           </label>
-          {zipOptions ? (
-            <select
-              id={`${id}-zip`}
-              name="zip"
-              defaultValue={values?.zip ?? defaultZip}
-              aria-invalid={Boolean(errors.zip) || undefined}
-              aria-describedby={errors.zip ? `${id}-zip-error` : undefined}
-              className={inputClass}
-            >
-              {zipOptions.map((option) => (
-                <option key={option.zip} value={option.zip}>
-                  {option.label}
-                </option>
-              ))}
-              <option value="">Everywhere else too</option>
-            </select>
-          ) : (
-            <input
-              id={`${id}-zip`}
-              name="zip"
-              type="text"
-              autoComplete="postal-code"
-              inputMode="numeric"
-              placeholder="ZIP (optional)"
-              maxLength={5}
-              defaultValue={values?.zip ?? defaultZip}
-              aria-invalid={Boolean(errors.zip) || undefined}
-              aria-describedby={errors.zip ? `${id}-zip-error` : undefined}
-              className={inputClass}
-            />
-          )}
-          {errors.zip && (
-            <p id={`${id}-zip-error`} className="mt-1.5 text-[14px] text-red-700">
-              {errors.zip}
+          <input
+            id={`${id}-zip`}
+            name="zip"
+            placeholder="ZIP (optional)"
+            {...zipCheck.input}
+            aria-invalid={zipCheck.status === "invalid" || Boolean(zipError) || undefined}
+            aria-describedby={`${id}-zip-feedback`}
+            className={inputClass}
+          />
+          {zipError && (
+            <p className="mt-1.5 text-[14px] text-red-700">
+              {zipError}
             </p>
           )}
         </div>
-        <Button type="submit" pending={pending || waiting} pendingLabel={pending ? "Signing up" : "One moment"} className="shrink-0">
+        <Button type="submit" pending={pending || waiting} pendingLabel={pending ? "Signing up" : "One moment"} disabled={zipCheck.status === "unserved"} className="shrink-0">
           {submitLabel}
         </Button>
       </div>
+      <ZipFeedback id={`${id}-zip-feedback`} check={zipCheck} source="listing-alerts" />
       {armed && <Turnstile ref={turnstile} onToken={onToken} action="listing-alerts" />}
       <p className="mt-3 text-[13px] leading-relaxed text-muted">Free. Unsubscribe anytime.</p>
       <p role="status" aria-live="polite" className="text-[15px] text-red-700">

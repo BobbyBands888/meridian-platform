@@ -1,4 +1,5 @@
 import { ListingAlertsForm } from "@/components/listing-alerts-form";
+import { zipDirectory } from "@/lib/areas";
 import { Check } from "@/components/photo-card";
 import { PrelaunchVendorSignup } from "@/components/prelaunch-vendor-signup";
 import { Container } from "@/components/ui";
@@ -35,7 +36,7 @@ export function ComingSoonHome({ market }: { market: Market }) {
               Be first to hear when owners list homes. Add a ZIP to focus on one area, or leave it blank for all of {market.region}.
             </p>
             <div className="mt-6 max-w-3xl">
-              <ListingAlertsForm />
+              <ListingAlertsForm zipDirectory={zipDirectory(market)} />
             </div>
           </div>
         </Container>

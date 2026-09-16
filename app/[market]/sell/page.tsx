@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { AreaWaitlistForm } from "@/components/area-waitlist-form";
 import { Check } from "@/components/photo-card";
 import { ButtonLink, Container } from "@/components/ui";
-import { zipGroups } from "@/lib/areas";
+import { FocusZipLink, ZipChecker } from "@/components/zip-field";
+import { zipDirectory } from "@/lib/areas";
 import { getCurrentProfile, getCurrentUser, isProfileComplete } from "@/lib/auth";
 import { getDisclosureGuidePath } from "@/lib/guides";
 import { requireMarket } from "@/lib/market-data";
@@ -48,6 +48,9 @@ export default async function SellPage({ params }: PageProps<"/[market]/sell">) 
           List your home free and hear from buyers yourself, anywhere in {serviceArea(market, countyList(market, "or"))}. You stay in charge of pricing,
           showings, and who you hire to close.
         </p>
+        <p className="mt-3 text-[15px]">
+          Not sure if we serve your area? <FocusZipLink targetId={user ? "zip" : "zip-check"}>Check your ZIP</FocusZipLink>
+        </p>
         <ul className="mt-6 grid gap-2 sm:grid-cols-2">
           {points.map((p) => (
             <li key={p}>
@@ -61,7 +64,8 @@ export default async function SellPage({ params }: PageProps<"/[market]/sell">) 
           <div className="mt-10">
             <ListingForm
               mode="create"
-              zipGroups={zipGroups(market)}
+              zipDirectory={zipDirectory(market)}
+              sellerEmail={user.email}
               disclosureNote={market.disclosure_note}
               disclosureGuidePath={await getDisclosureGuidePath(market.slug)}
               userId={user.id}
@@ -82,24 +86,14 @@ export default async function SellPage({ params }: PageProps<"/[market]/sell">) 
               We&apos;ll email you a sign-in link. Then add your address, details, and photos. We review every listing, usually
               within 24 hours.
             </p>
+            <div className="mt-5">
+              <ZipChecker id="zip-check" directory={zipDirectory(market)} source="/sell" />
+            </div>
             <ButtonLink href="/sign-in?next=/sell" className="mt-5">
               Sign in to list your home
             </ButtonLink>
           </div>
         )}
-
-        <section id="outside-area" aria-labelledby="outside-area-heading" className="mt-12 scroll-mt-24 rounded-2xl bg-surface px-6 py-8 sm:px-8">
-          <h2 id="outside-area-heading" className="text-xl font-semibold tracking-tight">
-            Not in our area yet?
-          </h2>
-          <p className="mt-2 text-[15px] leading-relaxed text-muted">
-            We list homes in {countyList(market)}. If yours is somewhere else, leave your email and ZIP and we&apos;ll tell you
-            when {brandName(market)} reaches it.
-          </p>
-          <div className="mt-5">
-            <AreaWaitlistForm source="/sell" defaultEmail={user?.email} />
-          </div>
-        </section>
       </div>
     </Container>
   );

@@ -4,10 +4,11 @@ import Link from "next/link";
 import { useActionState, useCallback, useState } from "react";
 import { PhotoUploader } from "@/components/photo-uploader";
 import { Button } from "@/components/ui";
+import { useZipCheck, ZipFeedback } from "@/components/zip-field";
 import type { ListingStatus } from "@/lib/database.types";
 import { checkFairHousing, type FairHousingIssue } from "@/lib/fair-housing";
 import { DESCRIPTION_MAX, statusLabels } from "@/lib/listings";
-import type { ZipGroup } from "@/lib/areas";
+import type { ZipDirectory } from "@/lib/areas";
 import type { ListingFormState, ListingFormValues } from "./actions";
 import { DescriptionAssistant } from "./description-assistant";
 
@@ -22,19 +23,23 @@ type Props = {
   /** Statuses a seller can switch between; empty while the listing is in review. */
   statusOptions?: ListingStatus[];
   submitLabel: string;
-  /** Market-specific: ZIP choices for new listings, and the state's seller disclosure rule. */
-  zipGroups?: ZipGroup[];
+  /** Market-specific: the ZIP codes new listings can use (with town and county), and the state's seller disclosure rule. */
+  zipDirectory?: ZipDirectory;
+  /** Prefills the waitlist email when the ZIP is outside the market. */
+  sellerEmail?: string;
   disclosureNote: string;
   disclosureGuidePath: string | null;
 };
 
-export function ListingForm({ mode, userId, listingId, action, initial, statusOptions = [], submitLabel, zipGroups = [], disclosureNote, disclosureGuidePath, draftId }: Props) {
+export function ListingForm({ mode, userId, listingId, action, initial, statusOptions = [], submitLabel, zipDirectory = {}, sellerEmail, disclosureNote, disclosureGuidePath, draftId }: Props) {
   const [state, formAction, pending] = useActionState<ListingFormState, FormData>(action, {});
   const values = state.values ?? initial;
   const errors = state.errors ?? {};
   const [photosBusy, setPhotosBusy] = useState(false);
   const onBusyChange = useCallback((busy: boolean) => setPhotosBusy(busy), []);
   const [description, setDescription] = useState(values.description);
+  const zipCheck = useZipCheck(zipDirectory, values.zip);
+  const zipOutOfArea = mode === "create" && zipCheck.status === "unserved";
 
   // Fair Housing issues from the last submit attempt, re-checked live as the seller edits.
   const [issues, setIssues] = useState<FairHousingIssue[] | null>(null);
@@ -60,21 +65,18 @@ export function ListingForm({ mode, userId, listingId, action, initial, statusOp
           <Field id="street" label="Street address" error={errors.street}>
             <input id="street" name="street" type="text" required autoComplete="address-line1" placeholder="1234 Main St" defaultValue={values.street} className={inputClass} aria-invalid={Boolean(errors.street) || undefined} />
           </Field>
-          <Field id="zip" label="ZIP code" hint="Don't see your ZIP? We may not cover your area yet. Leave your email below and we'll let you know." error={errors.zip}>
-            <select id="zip" name="zip" required defaultValue={values.zip} className={`${inputClass} bg-white`} aria-invalid={Boolean(errors.zip) || undefined}>
-              <option value="" disabled>
-                Choose a ZIP code
-              </option>
-              {zipGroups.map((group) => (
-                <optgroup key={group.county} label={`${group.county} County`}>
-                  {group.options.map((o) => (
-                    <option key={o.zip} value={o.zip}>
-                      {o.label}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
+          <Field id="zip" label="ZIP code" error={zipCheck.zip === values.zip ? errors.zip : undefined}>
+            <input
+              id="zip"
+              name="zip"
+              required
+              placeholder="37206"
+              {...zipCheck.input}
+              className={`${inputClass} scroll-mt-28 sm:max-w-[12rem]`}
+              aria-invalid={zipCheck.status === "invalid" || (zipCheck.zip === values.zip && Boolean(errors.zip)) || undefined}
+              aria-describedby="zip-feedback"
+            />
+            <ZipFeedback id="zip-feedback" check={zipCheck} source="/sell" defaultEmail={sellerEmail} />
           </Field>
           <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-line p-4 has-[:checked]:border-forest">
             <input type="checkbox" name="hide_exact_address" defaultChecked={values.hide_exact_address} className="mt-0.5 h-5 w-5 shrink-0 accent-[#1f4d3a]" />
@@ -194,7 +196,7 @@ export function ListingForm({ mode, userId, listingId, action, initial, statusOp
           type="submit"
           pending={pending || photosBusy}
           pendingLabel={pending ? (mode === "create" ? "Submitting" : "Saving") : "Waiting for photos"}
-          disabled={shownIssues.length > 0}
+          disabled={shownIssues.length > 0 || zipOutOfArea}
           className="sm:w-full"
         >
           {submitLabel}

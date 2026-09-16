@@ -4,7 +4,7 @@ import { ListingAlertsForm } from "@/components/listing-alerts-form";
 import { ListingCard } from "@/components/listing-card";
 import { CardGrid } from "@/components/photo-card";
 import { ButtonLink, Container, EmptyState } from "@/components/ui";
-import { areaContent, isAreaIndexable, zipPhrase, type Area } from "@/lib/areas";
+import { areaContent, isAreaIndexable, zipDirectory, zipPhrase, type Area } from "@/lib/areas";
 import { getGuides } from "@/lib/guides";
 import { brandName, type Market } from "@/lib/markets";
 import { getActiveListings } from "@/lib/public-listings";
@@ -39,7 +39,6 @@ export async function AreaPage({ market, area }: { market: Market; area: Area })
   const [listings, guides] = await Promise.all([getActiveListings(market.id, { zips: area.zips }), getGuides(market.slug)]);
   const [where, what] = intro(market, area);
   const content = areaContent(market, area);
-  const zipOptions = area.zips.map((zip) => ({ zip, label: `${zip} · ${area.name}` }));
 
   return (
     <Container className="py-10 sm:py-14">
@@ -103,7 +102,7 @@ export async function AreaPage({ market, area }: { market: Market; area: Area })
             We&apos;ll email you when an owner lists a home in {zipPhrase(area.zips)}.
           </p>
           <div className="mt-6 max-w-3xl">
-            <ListingAlertsForm defaultZip={area.zips[0]} zipOptions={zipOptions} submitLabel={`Alert me about ${area.name}`} />
+            <ListingAlertsForm zipDirectory={zipDirectory(market)} defaultZip={area.zips[0]} submitLabel={`Alert me about ${area.name}`} />
           </div>
         </div>
       </section>

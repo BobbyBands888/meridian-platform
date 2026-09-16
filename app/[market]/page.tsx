@@ -6,6 +6,7 @@ import { ListingCard } from "@/components/listing-card";
 import { CardGrid } from "@/components/photo-card";
 import { SearchBar } from "@/components/search-bar";
 import { ButtonLink, Container } from "@/components/ui";
+import { zipDirectory } from "@/lib/areas";
 import { getGuides } from "@/lib/guides";
 import { requireMarket } from "@/lib/market-data";
 import { brandName, isLive, marketTagline, serviceArea, type Market } from "@/lib/markets";
@@ -114,7 +115,7 @@ export default async function HomePage({ params }: PageProps<"/[market]">) {
               Hear when owners list new homes. Add a ZIP to focus on one area, or leave it blank for all of {serviceArea(market, market.region)}.
             </p>
             <div className="mt-6 max-w-3xl">
-              <ListingAlertsForm />
+              <ListingAlertsForm zipDirectory={zipDirectory(market)} />
             </div>
           </div>
         </Container>
