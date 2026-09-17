@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
+import { calculatorCardClass, rangeInputClass, resultTileClass } from "@/components/ui";
 import { formatPrice } from "@/lib/listings";
 
 const MIN = 150_000;
@@ -17,7 +18,7 @@ export function CommissionCalculator({ brand }: { brand: string }) {
   const [price, setPrice] = useState(DEFAULT);
 
   return (
-    <div className="rounded-3xl border border-line p-6 sm:p-10">
+    <div className={calculatorCardClass}>
       <label htmlFor={id} className="block text-[15px] font-medium">
         Sale price
       </label>
@@ -31,7 +32,7 @@ export function CommissionCalculator({ brand }: { brand: string }) {
         value={price}
         onChange={(e) => setPrice(Number(e.target.value))}
         aria-valuetext={formatPrice(price)}
-        className="mt-5 h-2 w-full cursor-pointer appearance-none rounded-full bg-line accent-forest focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest"
+        className={`mt-5 ${rangeInputClass}`}
       />
       <div className="mt-1 flex justify-between text-[13px] text-muted">
         <span>{formatPrice(MIN)}</span>
@@ -40,7 +41,7 @@ export function CommissionCalculator({ brand }: { brand: string }) {
 
       <dl aria-live="polite" className="mt-8 grid gap-3 sm:grid-cols-2">
         {[5, 6].map((rate) => (
-          <div key={rate} className="rounded-2xl bg-surface p-5">
+          <div key={rate} className={resultTileClass}>
             <dt className="text-[15px] text-muted">Agent commission at {rate}%</dt>
             <dd className="mt-1 text-3xl font-bold tracking-tight tabular-nums">{formatPrice(Math.round((price * rate) / 100))}</dd>
           </div>

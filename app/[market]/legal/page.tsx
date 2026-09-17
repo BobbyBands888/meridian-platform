@@ -108,6 +108,19 @@ export default async function LegalPage({ params }: PageProps<"/[market]/legal">
               they are shared only with the specific person you choose to contact through a form. You can request
               deletion of your account and data by emailing <Mail email={market.sender_email} />.
             </p>
+            <p className="mt-4">
+              <strong>Checklists and calculators.</strong> Checkmarks on our checklists are saved only in your own browser (local
+              storage) and are not sent to us. The cost calculator runs in your browser; the numbers you enter aren&apos;t saved by us,
+              though they appear in the page address so you can share an estimate. We record that a checklist or the calculator was
+              used, without your inputs, so we know which tools are helpful.
+            </p>
+            <p className="mt-4">
+              <strong>Where visitors come from.</strong> When you first arrive from a link that includes a source tag (for example,
+              one we shared in a community group), we keep that tag in a first-party cookie for 30 days. If you later send an
+              inquiry or sign up for alerts, we store the tag and the page you used with it, so we can tell which pages and
+              channels help people. The cookie holds only the tag, not your identity, and we don&apos;t use third-party advertising
+              trackers.
+            </p>
           </section>
 
           <section id="fair-housing" aria-labelledby="fair-housing-heading" className="scroll-mt-24">

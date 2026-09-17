@@ -7,19 +7,22 @@ import { Turnstile, type TurnstileHandle } from "@/components/turnstile";
 import { Button } from "@/components/ui";
 import { useZipCheck, ZipFeedback } from "@/components/zip-field";
 import type { ZipDirectory } from "@/lib/areas";
+import type { PageSource } from "@/lib/attribution";
 
 type Props = {
   /** The market's ZIP codes, so a typed ZIP gets its town and county (or a "not yet" note) right away. */
   zipDirectory: ZipDirectory;
   defaultZip?: string;
   submitLabel?: string;
+  /** Page source stored with the signup, for buyer pages. */
+  source?: PageSource;
 };
 
 /**
  * Email + optional ZIP signup for new-listing alerts. Turnstile's script loads only once someone starts using the
  * form, so pages that show it (like the home page) don't pay for it on every visit.
  */
-export function ListingAlertsForm({ zipDirectory, defaultZip = "", submitLabel = "Get listing alerts" }: Props) {
+export function ListingAlertsForm({ zipDirectory, defaultZip = "", submitLabel = "Get listing alerts", source }: Props) {
   const [state, formAction, pending] = useActionState<AlertSignupState, FormData>(subscribeToListingAlerts, {});
   const [armed, setArmed] = useState(false);
   const [waiting, setWaiting] = useState(false);
@@ -93,6 +96,7 @@ export function ListingAlertsForm({ zipDirectory, defaultZip = "", submitLabel =
         formAction(formData);
       }}
     >
+      {source && <input type="hidden" name="page_source" value={source} />}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
         <div className="min-w-0 flex-1">
           <label htmlFor={`${id}-email`} className="sr-only">

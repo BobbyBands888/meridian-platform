@@ -2,6 +2,7 @@ import { cache } from "react";
 import type { VendorCategoryValue } from "@/lib/database.types";
 import { vendorCategories } from "@/lib/site";
 import { CACHE_TAGS, createPublicClient } from "@/lib/supabase/public";
+import { fairVendorOrder } from "@/lib/vendor-order";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -39,11 +40,8 @@ export const getVendorsInCategory = cache(async (marketId: string, category: Ven
     .from("public_vendors")
     .select("*")
     .eq("market_id", marketId)
-    .eq("category", category)
-    // Verified vendors first, then the longest-standing.
-    .order("verified_at", { ascending: false, nullsFirst: false })
-    .order("created_at")
-    .limit(limit);
+    .eq("category", category);
   if (error) throw new Error(`Could not load ${category} vendors: ${error.message}`);
-  return data;
+  // Verified vendors first, rotating daily within each group (lib/vendor-order.ts).
+  return fairVendorOrder(data, category).slice(0, limit);
 });

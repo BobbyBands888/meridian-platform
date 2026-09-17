@@ -1,5 +1,5 @@
 import type { VendorCategoryValue } from "@/lib/database.types";
-import { vendorCategories } from "@/lib/site";
+import { plannedVendorCategories, vendorCategories, type ModuleCategory } from "@/lib/site";
 
 export type VendorCategoryInfo = (typeof vendorCategories)[number];
 
@@ -9,6 +9,32 @@ export function categoryBySlug(slug: string) {
 
 export function categoryByValue(value: VendorCategoryValue) {
   return vendorCategories.find((c) => c.value === value)!;
+}
+
+/** True for categories the directory accepts; false for planned trades. */
+export function isDirectoryCategory(value: ModuleCategory): value is VendorCategoryValue {
+  return vendorCategories.some((c) => c.value === value);
+}
+
+/** Label details for a directory or planned category, and whether vendors can join it yet. */
+export function moduleCategoryInfo(value: ModuleCategory) {
+  const directory = vendorCategories.find((c) => c.value === value);
+  if (directory) return { ...directory, joinable: true };
+  return { ...plannedVendorCategories.find((c) => c.value === value)!, joinable: false };
+}
+
+/** How sentences name a category's vendors ("closing attorneys and title companies"), where the label reads awkwardly. */
+const SENTENCE_NAMES: Partial<Record<ModuleCategory, { plural: string; singular: string }>> = {
+  attorney: { plural: "closing attorneys and title companies", singular: "closing attorney or title company" },
+  home_insurance: { plural: "home insurance agents", singular: "home insurance agent" },
+  hvac: { plural: "HVAC pros", singular: "HVAC pro" },
+  pest_control: { plural: "pest and termite control pros", singular: "pest and termite control pro" },
+  foundation_repair: { plural: "foundation and crawlspace pros", singular: "foundation and crawlspace pro" },
+};
+
+export function categorySentenceName(value: ModuleCategory) {
+  const info = moduleCategoryInfo(value);
+  return SENTENCE_NAMES[value] ?? { plural: info.label.toLowerCase(), singular: info.singular.toLowerCase() };
 }
 
 export function vendorPath(vendor: { id: string; category: VendorCategoryValue }) {

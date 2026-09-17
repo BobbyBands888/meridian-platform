@@ -1,10 +1,15 @@
 "use client";
 
-import { useActionState, useCallback, useEffect, useRef, useState } from "react";
+import { useActionState, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Check } from "@/components/photo-card";
 import { Turnstile, type TurnstileHandle } from "@/components/turnstile";
 import { Button } from "@/components/ui";
 import { sendInquiry, type InquiryState } from "@/app/_actions/inquiry";
+import { pageSource } from "@/lib/attribution";
+
+// The page source (?s=) is read in the browser so vendor and listing pages stay cached; the server checks it again.
+const readPageSource = () => pageSource(new URLSearchParams(window.location.search).get("s")) ?? "";
+const noopSubscribe = () => () => {};
 
 type Props = { type: "vendor" | "listing"; targetId: string; recipientLabel: string; brand: string };
 
@@ -15,6 +20,7 @@ export function ContactForm({ type, targetId, recipientLabel, brand }: Props) {
   const onToken = useCallback((t: string) => setToken(t), []);
   const errors = state.errors ?? {};
   const values = state.values;
+  const source = useSyncExternalStore(noopSubscribe, readPageSource, () => "");
 
   // Turnstile tokens are single-use: get a fresh one after every failed attempt.
   useEffect(() => {
@@ -35,6 +41,7 @@ export function ContactForm({ type, targetId, recipientLabel, brand }: Props) {
       <input type="hidden" name="type" value={type} />
       <input type="hidden" name="target_id" value={targetId} />
       <input type="hidden" name="turnstile_token" value={token} />
+      <input type="hidden" name="page_source" value={source} />
 
       <div className="grid gap-5 sm:grid-cols-2">
         <Field id="contact-name" label="Your name" error={errors.name}>

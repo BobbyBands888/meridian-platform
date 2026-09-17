@@ -2,35 +2,42 @@ import "server-only";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { cache } from "react";
-import type { VendorCategoryValue } from "@/lib/database.types";
 import { brandName, serviceArea, type Market } from "@/lib/markets";
-import { vendorCategories } from "@/lib/site";
+import { plannedVendorCategories, vendorCategories, type ModuleCategory } from "@/lib/site";
 
 export type ChecklistStep = {
   id: string;
   number: number;
   title: string;
   body: string;
-  categories: VendorCategoryValue[];
+  categories: ModuleCategory[];
 };
 
 export type ChecklistSection = { number: number; title: string; steps: ChecklistStep[] };
 
 export type Checklist = { title: string; disclaimer: string; closingNote: string; sections: ChecklistSection[] };
 
-const CHECKLIST_FILE = path.join(process.cwd(), "content", "checklist.md");
+/** Which checklist: the seller's pre-sale list, the buyer's, or the new homeowner's first year. */
+export type ChecklistKind = "seller" | "buyer" | "moved_in";
+
+const CHECKLIST_FILES: Record<ChecklistKind, string> = {
+  seller: "checklist.md",
+  buyer: "buyer-checklist.md",
+  moved_in: "moved-in-checklist.md",
+};
 
 // "(Home Inspectors)" or "(Painters, Handymen)" marks a step with vendor categories, by the directory's label or its URL
-// slug ("(Attorneys)" still works now that the label is "Closing Attorneys & Title").
-const labelToCategory = new Map<string, VendorCategoryValue>(
-  vendorCategories.flatMap((c) => [
+// slug ("(Attorneys)" still works now that the label is "Closing Attorneys & Title"). Planned trades are tagged by slug:
+// "(Roofers)", "(HVAC)", "(Pest Control)", "(Foundation Crawlspace)".
+const labelToCategory = new Map<string, ModuleCategory>(
+  [...vendorCategories, ...plannedVendorCategories].flatMap((c) => [
     [c.label.toLowerCase(), c.value],
     [c.slug.replace(/-/g, " "), c.value],
   ]),
 );
 
 function extractCategories(text: string) {
-  const categories: VendorCategoryValue[] = [];
+  const categories: ModuleCategory[] = [];
   const cleaned = text.replace(/\s*\(([^()]+)\)/g, (match, inner: string) => {
     const parts = inner.split(/\s*(?:,|\band\b|&)\s*/i).map((p) => p.trim().toLowerCase()).filter(Boolean);
     const found = parts.map((p) => labelToCategory.get(p));
@@ -57,9 +64,15 @@ export function parseChecklist(markdown: string): Checklist {
 
   const flushStep = () => {
     if (!current || sections.length === 0) return;
-    const { text, categories } = extractCategories(current.text.join(" "));
-    const { title: stepTitle, body } = splitTitle(text);
-    sections[sections.length - 1].steps.push({ id: `step-${current.number}`, number: current.number, title: stepTitle, body, categories });
+    // An optional stable id, "{#preapproval}", keeps saved checkmarks attached to the step when steps are renumbered.
+    // With an id, everything before it is the title (which may be more than one sentence) and everything after is the body.
+    const joined = current.text.join(" ");
+    const idMatch = joined.match(/\s*\{#([a-z0-9-]{2,60})\}\s*/);
+    const { text, categories } = extractCategories(idMatch ? joined.replace(idMatch[0], " {#} ") : joined);
+    const [head, tail] = idMatch ? text.split(/\s*\{#\}\s*/, 2) : [text, null];
+    const { title: stepTitle, body } = tail === null ? splitTitle(head) : { title: head.trim(), body: tail.trim() };
+    const id = idMatch ? idMatch[1] : `step-${current.number}`;
+    sections[sections.length - 1].steps.push({ id, number: current.number, title: stepTitle, body, categories });
     current = null;
   };
 
@@ -108,8 +121,8 @@ export function fillMarketPlaceholders(text: string, market: Market) {
   return text.replace(/\{(brand|name|region|state|closing|disclosure)\}/g, (_, key: string) => values[key]);
 }
 
-const readChecklistFile = cache(() => readFile(CHECKLIST_FILE, "utf8"));
+const readChecklistFile = cache((kind: ChecklistKind) => readFile(path.join(process.cwd(), "content", CHECKLIST_FILES[kind]), "utf8"));
 
-export async function getChecklist(market: Market) {
-  return parseChecklist(fillMarketPlaceholders(await readChecklistFile(), market));
+export async function getChecklist(market: Market, kind: ChecklistKind = "seller") {
+  return parseChecklist(fillMarketPlaceholders(await readChecklistFile(kind), market));
 }

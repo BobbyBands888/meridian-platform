@@ -1,7 +1,7 @@
 import { isAreaIndexable, marketAreas } from "@/lib/areas";
 import { getGuides } from "@/lib/guides";
 import { getMarket, getMarkets } from "@/lib/market-data";
-import { isLive, marketUrl } from "@/lib/markets";
+import { hasBuyerFeatures, isLive, marketUrl } from "@/lib/markets";
 import { getSitemapListings } from "@/lib/public-listings";
 import { getActiveVendorCategories } from "@/lib/public-vendors";
 import { latestDate, siteContentDate, sitemapResponse, type SitemapEntry } from "@/lib/sitemap";
@@ -48,6 +48,14 @@ export async function GET(_request: Request, { params }: RouteContext<"/[market]
     { url: url("/"), changeFrequency: "daily", priority: 1, lastModified: contentDate },
     { url: url("/homes"), changeFrequency: "daily", priority: 0.9, lastModified: contentDate },
     { url: url("/homes/areas"), changeFrequency: "monthly", priority: 0.6, lastModified: contentDate },
+    ...(hasBuyerFeatures(market)
+      ? [
+          { url: url("/buy"), changeFrequency: "weekly" as const, priority: 0.8, lastModified: contentDate },
+          { url: url("/buy/checklist"), changeFrequency: "monthly" as const, priority: 0.7, lastModified: contentDate },
+          { url: url("/buy/calculator"), changeFrequency: "monthly" as const, priority: 0.7, lastModified: contentDate },
+          { url: url("/buy/moved-in"), changeFrequency: "monthly" as const, priority: 0.6, lastModified: contentDate },
+        ]
+      : []),
     { url: url("/sell"), changeFrequency: "monthly", priority: 0.8, lastModified: contentDate },
     { url: url("/sell/checklist"), changeFrequency: "weekly", priority: 0.7, lastModified: contentDate },
     { url: url("/sell/course"), changeFrequency: "monthly", priority: 0.6, lastModified: contentDate },

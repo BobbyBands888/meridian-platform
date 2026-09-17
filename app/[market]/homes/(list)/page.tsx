@@ -6,7 +6,7 @@ import { ListingAlertsForm } from "@/components/listing-alerts-form";
 import { ListingCard } from "@/components/listing-card";
 import { zipDirectory, zipGroups, zipsForSearch } from "@/lib/areas";
 import { requireMarket } from "@/lib/market-data";
-import { countyList, serviceArea } from "@/lib/markets";
+import { countyList, hasBuyerFeatures, serviceArea } from "@/lib/markets";
 import { getActiveListings, type ListingFilters } from "@/lib/public-listings";
 import { HomeFilters } from "./home-filters";
 
@@ -76,7 +76,7 @@ export default async function HomesPage({ params: routeParams, searchParams }: P
             title={filtered ? "No homes match those filters" : "No homes listed yet"}
             actions={
               <>
-                <ButtonLink href="/guides">Read the guides</ButtonLink>
+                {hasBuyerFeatures(market) ? <ButtonLink href="/buy/checklist">Buyer checklist</ButtonLink> : <ButtonLink href="/guides">Read the guides</ButtonLink>}
                 {filtered && (
                   <ButtonLink href="/homes" variant="secondary">
                     Clear filters

@@ -111,6 +111,10 @@ type LeadRow = {
   /** Structured fields for an "interest" lead (see lib/interest.ts); null for other types. */
   details: Json | null;
   market_id: string;
+  /** Site page the lead came from (lib/attribution.ts PAGE_SOURCES), when known. */
+  page_source: string | null;
+  /** First outside ?s= value the sender arrived with (30-day cookie). */
+  first_source: string | null;
   created_at: string;
 };
 
@@ -120,6 +124,8 @@ type ListingAlertRow = {
   zip: string | null;
   unsubscribe_token: string;
   market_id: string;
+  page_source: string | null;
+  first_source: string | null;
   created_at: string;
   unsubscribed_at: string | null;
 };
@@ -219,11 +225,27 @@ type ListingDraftRow = {
   updated_at: string;
 };
 
+export type FunnelEventName =
+  | "form_start"
+  | "contact_saved"
+  | "address_done"
+  | "photos_done"
+  | "submitted"
+  | "email_verified"
+  | "buyer_checklist_start"
+  | "moved_in_start"
+  | "calculator_use"
+  | "wanted_post_created"
+  | "wanted_seller_contact"
+  | "wanted_buyer_shared"
+  | "wanted_match_clicked";
+
 type FunnelEventRow = {
   id: number;
   market_id: string;
-  event: "form_start" | "contact_saved" | "address_done" | "photos_done" | "submitted" | "email_verified";
+  event: FunnelEventName;
   source: string;
+  first_source: string | null;
   draft_id: string | null;
   created_at: string;
 };
@@ -389,8 +411,8 @@ export type Database = {
       };
       leads: {
         Row: LeadRow;
-        Insert: Omit<LeadRow, "id" | "created_at" | "sender_phone" | "source" | "details"> &
-          Partial<Pick<LeadRow, "id" | "created_at" | "sender_phone" | "source" | "details">>;
+        Insert: Omit<LeadRow, "id" | "created_at" | "sender_phone" | "source" | "details" | "page_source" | "first_source"> &
+          Partial<Pick<LeadRow, "id" | "created_at" | "sender_phone" | "source" | "details" | "page_source" | "first_source">>;
         Update: Partial<LeadRow>;
         Relationships: [];
       };

@@ -2,6 +2,8 @@
 
 import { headers } from "next/headers";
 import { isServiceZip } from "@/lib/areas";
+import { pageSource } from "@/lib/attribution";
+import { readFirstSource } from "@/lib/first-source";
 import { sendAlertConfirmation } from "@/lib/listing-alerts";
 import { getRequestMarket } from "@/lib/market-data";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -13,6 +15,13 @@ export type AlertSignupState = {
   errors?: Partial<Record<"email" | "zip", string>>;
   values?: { email: string; zip: string };
 };
+
+/** Where a new signup came from. Only set keys are sent, so existing signups work before the columns exist. */
+async function signupSources(formData: FormData) {
+  const page = pageSource(formData.get("page_source"));
+  const first = await readFirstSource();
+  return { ...(page ? { page_source: page } : {}), ...(first ? { first_source: first } : {}) };
+}
 
 export async function subscribeToListingAlerts(_prev: AlertSignupState, formData: FormData): Promise<AlertSignupState> {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
@@ -52,7 +61,11 @@ export async function subscribeToListingAlerts(_prev: AlertSignupState, formData
   // quietly, so the form can't be used to send someone the same email over and over.
   let confirmToken: string | null = null;
   if (!existing) {
-    const { data, error } = await admin.from("listing_alerts").insert({ email, zip: zipValue, market_id: market.id }).select("unsubscribe_token").single();
+    const { data, error } = await admin
+      .from("listing_alerts")
+      .insert({ email, zip: zipValue, market_id: market.id, ...(await signupSources(formData)) })
+      .select("unsubscribe_token")
+      .single();
     if (error && error.code !== "23505") {
       console.error("listing alert insert failed", error.code, error.message);
       return { status: "error", message: "We couldn't sign you up. Please try again.", values };

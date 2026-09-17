@@ -1,7 +1,9 @@
 "use server";
 
 import { headers } from "next/headers";
+import { pageSource } from "@/lib/attribution";
 import { adminEmail, sendEmail, siteLink } from "@/lib/email";
+import { readFirstSource } from "@/lib/first-source";
 import { getMarketById } from "@/lib/market-data";
 import { brandName, isLive, type Market } from "@/lib/markets";
 import { normalizeUsPhone, formatUsPhone } from "@/lib/phone";
@@ -62,6 +64,7 @@ export async function sendInquiry(_prev: InquiryState, formData: FormData): Prom
   const message = String(formData.get("message") ?? "").trim();
   const consent = formData.get("consent") === "on";
   const token = String(formData.get("turnstile_token") ?? "");
+  const leadPageSource = pageSource(formData.get("page_source"));
 
   const values = { name, email, phone: phoneInput, message };
   const errors: InquiryState["errors"] = {};
@@ -88,6 +91,7 @@ export async function sendInquiry(_prev: InquiryState, formData: FormData): Prom
   }
 
   const admin = createAdminClient();
+  const firstSource = await readFirstSource();
   const { error: insertError } = await admin.from("leads").insert({
     type: type as "vendor" | "listing",
     target_id: targetId,
@@ -98,6 +102,9 @@ export async function sendInquiry(_prev: InquiryState, formData: FormData): Prom
     message,
     consent: true,
     source: recipient.source,
+    // Only sent when set, so leads keep working if this deploy ever runs ahead of its migration.
+    ...(leadPageSource ? { page_source: leadPageSource } : {}),
+    ...(firstSource ? { first_source: firstSource } : {}),
   });
   if (insertError) {
     console.error("lead insert failed", insertError.code, insertError.message);
@@ -132,7 +139,17 @@ export async function sendInquiry(_prev: InquiryState, formData: FormData): Prom
       subject: `[Lead copy] ${type} inquiry for ${recipient.subjectLabel}`,
       heading: `New ${type} inquiry`,
       blocks: [
-        { kind: "rows", rows: [["For", recipient.subjectLabel], ["Recipient", recipient.email], ["Market", brandName(recipient.market)], ...rows] },
+        {
+          kind: "rows",
+          rows: [
+            ["For", recipient.subjectLabel],
+            ["Recipient", recipient.email],
+            ["Market", brandName(recipient.market)],
+            ...rows,
+            ...(leadPageSource ? ([["Page source", leadPageSource]] as [string, string][]) : []),
+            ...(firstSource ? ([["First source", firstSource]] as [string, string][]) : []),
+          ],
+        },
         { kind: "quote", text: message },
       ],
     }),

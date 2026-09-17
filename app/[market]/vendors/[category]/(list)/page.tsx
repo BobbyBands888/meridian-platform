@@ -9,6 +9,7 @@ import { brandName, isLive } from "@/lib/markets";
 import { getActiveVendorCategories } from "@/lib/public-vendors";
 import { VENDOR_CATEGORY_LIMIT_NOTE, vendorCategories } from "@/lib/site";
 import { CACHE_TAGS, createPublicClient } from "@/lib/supabase/public";
+import { fairVendorOrder } from "@/lib/vendor-order";
 import { categoryBySlug } from "@/lib/vendors";
 
 export const revalidate = 300;
@@ -60,16 +61,12 @@ export default async function VendorCategoryPage({ params }: PageProps<"/[market
   if (slug !== ALL.slug && !category) notFound(); // The layout already 404s; this narrows the type.
 
   const supabase = createPublicClient({ tags: [CACHE_TAGS.vendors] });
-  // Verified vendors first, then by join date.
-  let query = supabase
-    .from("public_vendors")
-    .select("*")
-    .eq("market_id", market.id)
-    .order("verified_at", { ascending: false, nullsFirst: false })
-    .order("created_at", { ascending: true });
+  let query = supabase.from("public_vendors").select("*").eq("market_id", market.id);
   if (category) query = query.eq("category", category.value);
-  const { data: vendors, error } = await query;
+  const { data, error } = await query;
   if (error) throw new Error(`Could not load vendors: ${error.message}`);
+  // Verified vendors first, rotating daily within each group (lib/vendor-order.ts).
+  const vendors = fairVendorOrder(data, slug);
 
   const label = category?.label ?? ALL.label;
   const activeCategories = await getActiveVendorCategories(market.id);

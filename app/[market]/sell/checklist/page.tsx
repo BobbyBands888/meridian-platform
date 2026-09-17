@@ -12,8 +12,9 @@ import { serviceArea } from "@/lib/markets";
 import { VENDOR_CATEGORY_LIMIT_NOTE } from "@/lib/site";
 import type { PublicVendor, VendorCategoryValue } from "@/lib/database.types";
 import { CACHE_TAGS, createPublicClient } from "@/lib/supabase/public";
-import { categoryByValue } from "@/lib/vendors";
-import { Checklist, type ChecklistSectionView } from "./checklist";
+import { fairVendorOrder } from "@/lib/vendor-order";
+import { categoryByValue, isDirectoryCategory } from "@/lib/vendors";
+import { Checklist, type ChecklistSectionView } from "@/components/checklist";
 import { SubmittedBanner } from "./submitted-banner";
 
 export const revalidate = 300;
@@ -40,19 +41,9 @@ function contentLinksFor(disclosureGuide: string | null) {
   return (step: ChecklistStep) => links.filter((l) => l.test.test(step.title)).map(({ href, label }) => ({ href, label }));
 }
 
-function shuffle<T>(items: T[]) {
-  const copy = [...items];
-  for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
-  }
-  return copy;
-}
-
-// Verified vendors come first; each group is shuffled when the page regenerates (every few minutes) so
-// recommendations rotate fairly.
-function pick(vendors: PublicVendor[]) {
-  return [...shuffle(vendors.filter((v) => v.verified_at)), ...shuffle(vendors.filter((v) => !v.verified_at))].slice(0, PER_CATEGORY);
+// Verified vendors come first; each group rotates daily (lib/vendor-order.ts) so recommendations spread fairly.
+function pick(vendors: PublicVendor[], category: VendorCategoryValue) {
+  return fairVendorOrder(vendors, category).slice(0, PER_CATEGORY);
 }
 
 function Disclaimer({ text }: { text: string }) {
@@ -67,7 +58,7 @@ export default async function ChecklistPage({ params }: PageProps<"/[market]/sel
   const market = await requireMarket((await params).market);
   const [checklist, disclosureGuide] = await Promise.all([getChecklist(market), getDisclosureGuidePath(market.slug)]);
   const contentLinks = contentLinksFor(disclosureGuide);
-  const mentioned = [...new Set(checklist.sections.flatMap((s) => s.steps.flatMap((step) => step.categories)))];
+  const mentioned = [...new Set(checklist.sections.flatMap((s) => s.steps.flatMap((step) => step.categories)))].filter(isDirectoryCategory);
   const categoryOrder = [...PREFERRED_ORDER.filter((c) => mentioned.includes(c)), ...mentioned.filter((c) => !PREFERRED_ORDER.includes(c))];
 
   const { data, error } = categoryOrder.length
@@ -76,7 +67,7 @@ export default async function ChecklistPage({ params }: PageProps<"/[market]/sel
   if (error) throw new Error(`Could not load vendors: ${error.message}`);
 
   const vendorSections = categoryOrder
-    .map((category) => ({ category, info: categoryByValue(category), vendors: pick(data.filter((v) => v.category === category)) }))
+    .map((category) => ({ category, info: categoryByValue(category), vendors: pick(data.filter((v) => v.category === category), category) }))
     .filter((s) => s.vendors.length > 0);
   const withVendors = new Set(vendorSections.map((s) => s.category));
 
@@ -90,7 +81,7 @@ export default async function ChecklistPage({ params }: PageProps<"/[market]/sel
       title: step.title,
       body: step.body,
       links: [
-        ...step.categories.filter((c) => withVendors.has(c)).map((c) => ({ href: `#vendors-${c}`, label: `Local ${categoryByValue(c).label.toLowerCase()}` })),
+        ...step.categories.filter(isDirectoryCategory).filter((c) => withVendors.has(c)).map((c) => ({ href: `#vendors-${c}`, label: `Local ${categoryByValue(c).label.toLowerCase()}` })),
         ...contentLinks(step),
       ],
     })),

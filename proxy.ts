@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { externalSource, FIRST_SOURCE_COOKIE, FIRST_SOURCE_MAX_AGE } from "@/lib/attribution";
 import { resolveHost } from "@/lib/market-host";
 import { updateSession } from "@/lib/supabase/proxy";
 
@@ -25,7 +26,20 @@ export async function proxy(request: NextRequest) {
   }
 
   rewriteTo.pathname = `/${target.slug}${rest}`;
-  return updateSession(request, { rewriteTo, extraHeaders: { "x-market": target.slug } });
+  const response = await updateSession(request, { rewriteTo, extraHeaders: { "x-market": target.slug } });
+
+  // First touch wins: keep the first outside ?s= value for 30 days (lib/attribution.ts).
+  const firstSource = request.cookies.has(FIRST_SOURCE_COOKIE) ? null : externalSource(request.nextUrl.searchParams.get("s"));
+  if (firstSource) {
+    response.cookies.set(FIRST_SOURCE_COOKIE, firstSource, {
+      maxAge: FIRST_SOURCE_MAX_AGE,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+    });
+  }
+  return response;
 }
 
 export const config = {

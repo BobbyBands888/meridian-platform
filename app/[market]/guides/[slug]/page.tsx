@@ -4,12 +4,15 @@ import { notFound } from "next/navigation";
 import { CardGrid } from "@/components/photo-card";
 import { ButtonLink, Container } from "@/components/ui";
 import { VendorCard } from "@/components/vendor-card";
+import { VendorModule, VendorModuleNote } from "@/components/vendor-module";
+import { withSource } from "@/lib/attribution";
 import type { PublicVendor } from "@/lib/database.types";
 import { formatGuideDate, getGuide, getGuides } from "@/lib/guides";
 import { getMarket, requireMarket } from "@/lib/market-data";
 import { brandName, COMPANY, isLive, marketUrl } from "@/lib/markets";
 import { getActiveVendorCategories } from "@/lib/public-vendors";
 import { CACHE_TAGS, createPublicClient } from "@/lib/supabase/public";
+import { fairVendorOrder } from "@/lib/vendor-order";
 import { categoryByValue } from "@/lib/vendors";
 
 // Vendor recommendations refresh with the vendors cache tag; the article itself only changes on deploy.
@@ -60,15 +63,14 @@ export default async function GuidePage({ params }: PageProps<"/[market]/guides/
           .select("*")
           .eq("market_id", market.id)
           .in("category", guide.vendorCategories)
-          .order("verified_at", { ascending: false, nullsFirst: false })
-          .order("created_at", { ascending: true })
       : Promise.resolve({ data: [] as PublicVendor[] }),
     getGuides(market.slug),
     getActiveVendorCategories(market.id),
   ]);
 
+  const buyerGuide = guide.audience === "buyer";
   const vendorSections = guide.vendorCategories
-    .map((category) => ({ info: categoryByValue(category), vendors: (vendors ?? []).filter((v) => v.category === category).slice(0, PER_CATEGORY) }))
+    .map((category) => ({ info: categoryByValue(category), vendors: fairVendorOrder((vendors ?? []).filter((v) => v.category === category), category).slice(0, PER_CATEGORY) }))
     .filter((s) => s.vendors.length > 0);
   const otherGuides = allGuides.filter((g) => g.slug !== guide.slug);
   // Only point readers at directory categories that currently have approved vendors.
@@ -117,7 +119,25 @@ export default async function GuidePage({ params }: PageProps<"/[market]/guides/
         </article>
       </Container>
 
-      {vendorSections.length > 0 && (
+      {buyerGuide && guide.vendorCategories.length > 0 && (
+        <section aria-labelledby="guide-pros" className="bg-surface">
+          <Container className="py-12 sm:py-16">
+            <h2 id="guide-pros" className="text-3xl font-bold tracking-tight">
+              Local pros for this step
+            </h2>
+            <div className="mt-2 max-w-2xl">
+              <VendorModuleNote />
+            </div>
+            <div className="mt-8 space-y-12">
+              {guide.vendorCategories.map((category) => (
+                <VendorModule key={category} market={market} category={category} vendors={fairVendorOrder((vendors ?? []).filter((v) => v.category === category), category)} source="buyer_guide" />
+              ))}
+            </div>
+          </Container>
+        </section>
+      )}
+
+      {!buyerGuide && vendorSections.length > 0 && (
         <section aria-labelledby="guide-pros" className="bg-surface">
           <Container className="py-12 sm:py-16">
             <h2 id="guide-pros" className="text-3xl font-bold tracking-tight">
@@ -151,7 +171,7 @@ export default async function GuidePage({ params }: PageProps<"/[market]/guides/
 
       <Container className="py-12">
         <div className="mx-auto max-w-2xl space-y-8">
-          {vendorSections.length === 0 && browseCategories.length > 0 && (
+          {!buyerGuide && vendorSections.length === 0 && browseCategories.length > 0 && (
             <p className="text-[15px] leading-relaxed text-muted">
               Looking for help? Browse{" "}
               {browseCategories.map((c, i) => (
@@ -181,12 +201,21 @@ export default async function GuidePage({ params }: PageProps<"/[market]/guides/
             </div>
           )}
 
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <ButtonLink href="/sell">List your home</ButtonLink>
-            <ButtonLink href="/sell/checklist" variant="secondary">
-              Pre-sale checklist
-            </ButtonLink>
-          </div>
+          {buyerGuide ? (
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <ButtonLink href={withSource("/buy/calculator", "buyer_guide")}>Estimate your costs</ButtonLink>
+              <ButtonLink href={withSource("/buy/checklist", "buyer_guide")} variant="secondary">
+                Buyer checklist
+              </ButtonLink>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <ButtonLink href="/sell">List your home</ButtonLink>
+              <ButtonLink href="/sell/checklist" variant="secondary">
+                Pre-sale checklist
+              </ButtonLink>
+            </div>
+          )}
         </div>
       </Container>
     </>

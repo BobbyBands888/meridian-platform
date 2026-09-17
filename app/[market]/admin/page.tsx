@@ -6,6 +6,7 @@ import { areaForZip, locationLine } from "@/lib/areas";
 import { requireAdmin } from "@/lib/auth";
 import type { Lead } from "@/lib/database.types";
 import { interestRows, readInterestDetails } from "@/lib/interest";
+import { getGuides } from "@/lib/guides";
 import { attachLeadTargets } from "@/lib/leads";
 import { formatPrice } from "@/lib/listings";
 import { getMarkets, requireMarket } from "@/lib/market-data";
@@ -29,6 +30,7 @@ const TABS = [
   { key: "funnel", label: "Funnel" },
   { key: "leads", label: "All Leads" },
   { key: "buyers", label: "Buyers" },
+  { key: "guides", label: "Guides" },
   { key: "markets", label: "Markets" },
 ] as const;
 type Tab = (typeof TABS)[number]["key"];
@@ -101,6 +103,8 @@ export default async function AdminPage({ params: routeParams, searchParams }: P
     scoped(admin.from("listing_drafts").select("id", { count: "exact", head: true }).neq("status", "verified")),
     scoped(admin.from("vendors").select("id", { count: "exact", head: true })),
   ]);
+  const guideMarket = scope.market ?? siteMarket;
+  const guides = await getGuides(guideMarket.slug);
   const alertSubscribers = alertsActive.count ?? 0;
   const alertUnsubscribed = (alertsTotal.count ?? 0) - alertSubscribers;
   const counts: Record<Tab, number> = {
@@ -111,6 +115,7 @@ export default async function AdminPage({ params: routeParams, searchParams }: P
     funnel: 0,
     leads: leadsCount.count ?? 0,
     buyers: (buyersCount.count ?? 0) + (alertsTotal.count ?? 0),
+    guides: guides.filter((g) => g.needsAttorneyReview).length,
     markets: markets.length,
   };
 
@@ -193,6 +198,7 @@ export default async function AdminPage({ params: routeParams, searchParams }: P
         {tab === "funnel" && <Funnel scope={scope} source={typeof params.source === "string" ? params.source : ""} />}
         {tab === "leads" && <AllLeads scope={scope} marketsById={marketsById} page={page} type={leadType} />}
         {tab === "buyers" && <Buyers scope={scope} marketsById={marketsById} />}
+        {tab === "guides" && <Guides market={guideMarket} guides={guides} />}
         {tab === "markets" && <Markets markets={markets} returnTo={withScope(scope, "/admin?tab=markets")} />}
       </div>
     </Container>
@@ -368,6 +374,12 @@ const FUNNEL_STEPS = [
   { event: "email_verified", label: "Confirmed email" },
 ] as const;
 
+const BUYER_TOOL_STEPS = [
+  { event: "buyer_checklist_start", label: "Started the buyer checklist" },
+  { event: "moved_in_start", label: "Started the new homeowner checklist" },
+  { event: "calculator_use", label: "Used the cost calculator" },
+] as const;
+
 /** Rows read for the Funnel tab: plenty for 30 days at current volume, and a ceiling on page cost. */
 const FUNNEL_ROW_CAP = 50_000;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -383,7 +395,14 @@ async function Funnel({ scope, source }: { scope: Scope; source: string }) {
     .order("created_at", { ascending: false })
     .limit(FUNNEL_ROW_CAP);
   if (scope.market) query = query.eq("market_id", scope.market.id);
-  const { data, error } = await query;
+  let leadQuery = createAdminClient()
+    .from("leads")
+    .select("page_source, first_source, created_at")
+    .eq("type", "vendor")
+    .gte("created_at", since.toISOString())
+    .limit(FUNNEL_ROW_CAP);
+  if (scope.market) leadQuery = leadQuery.eq("market_id", scope.market.id);
+  const [{ data, error }, leadsResult] = await Promise.all([query, leadQuery]);
   if (error) return <EmptyState title="The funnel couldn't be loaded">{error.message}</EmptyState>;
 
   const rows = data ?? [];
@@ -433,10 +452,116 @@ async function Funnel({ scope, source }: { scope: Scope; source: string }) {
           </tbody>
         </table>
       </div>
+      <h2 className="pt-4 text-xl font-semibold tracking-tight">Buyer tools</h2>
+      <div className="overflow-x-auto rounded-2xl border border-line">
+        <table className="w-full min-w-[520px] text-left text-[14px]">
+          <thead className="bg-surface text-[13px] text-muted">
+            <tr>
+              <th className="px-4 py-3 font-medium">Event</th>
+              <th className="px-4 py-3 text-right font-medium">Last 7 days</th>
+              <th className="px-4 py-3 text-right font-medium">Last 30 days</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-line">
+            {BUYER_TOOL_STEPS.map((step) => (
+              <tr key={step.event}>
+                <td className="px-4 py-3">
+                  {step.label} <span className="text-[13px] text-muted">({step.event})</span>
+                </td>
+                <td className="px-4 py-3 text-right tabular-nums">{count(step.event, 7).toLocaleString("en-US")}</td>
+                <td className="px-4 py-3 text-right tabular-nums">{count(step.event, 30).toLocaleString("en-US")}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <SourceBreakdown
+        title="Vendor leads by source (30 days)"
+        rows={leadsResult.data ?? []}
+        error={leadsResult.error?.message}
+        empty="No vendor leads in the last 30 days."
+      />
+      <p className="text-[13px] text-muted">
+        Buyer tool events count once per browser. The source filter above applies to the event tables; page source is the site page
+        a lead came from, first source is the first outside ?s= link the person arrived with (30-day cookie).
+      </p>
       <p className="text-[13px] text-muted">
         Counts events, not unique people. Steps after a draft exists count once per draft; &ldquo;Started the form&rdquo; counts once per page visit.
         {rows.length >= FUNNEL_ROW_CAP ? ` Only the latest ${FUNNEL_ROW_CAP.toLocaleString("en-US")} events are counted.` : ""}
       </p>
+    </div>
+  );
+}
+
+/** Leads grouped by page source and by first source, side by side. */
+function SourceBreakdown({ title, rows, error, empty }: { title: string; rows: { page_source: string | null; first_source: string | null }[]; error?: string; empty: string }) {
+  if (error) return <EmptyState title="Lead sources couldn't be loaded">{error}</EmptyState>;
+  const tally = (key: "page_source" | "first_source") => {
+    const counts = new Map<string, number>();
+    for (const r of rows) counts.set(r[key] ?? "none", (counts.get(r[key] ?? "none") ?? 0) + 1);
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]);
+  };
+  return (
+    <section aria-label={title} className="space-y-3 pt-4">
+      <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
+      {rows.length === 0 ? (
+        <p className="text-[15px] text-muted">{empty}</p>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {(["page_source", "first_source"] as const).map((key) => (
+            <table key={key} className="w-full overflow-hidden rounded-2xl border border-line text-left text-[14px]">
+              <thead className="bg-surface text-[13px] text-muted">
+                <tr>
+                  <th className="px-4 py-3 font-medium">{key === "page_source" ? "Page source" : "First source"}</th>
+                  <th className="px-4 py-3 text-right font-medium">Leads</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line">
+                {tally(key).map(([value, n]) => (
+                  <tr key={value}>
+                    <td className="px-4 py-3">{value}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{n.toLocaleString("en-US")}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** Guides in this market, with the ones waiting on attorney review first. */
+function Guides({ market, guides }: { market: Market; guides: Awaited<ReturnType<typeof getGuides>> }) {
+  const sorted = [...guides].sort((a, b) => Number(b.needsAttorneyReview) - Number(a.needsAttorneyReview));
+  return (
+    <div className="space-y-4">
+      <p className="max-w-2xl text-[15px] leading-relaxed text-muted">
+        {brandName(market)} guides. &ldquo;Needs attorney review&rdquo; comes from <code>attorneyReview: needed</code> in the guide&apos;s
+        front matter; remove that line once review is done and redeploy.
+      </p>
+      {sorted.length ? (
+        <ul className="divide-y divide-line rounded-2xl border border-line">
+          {sorted.map((g) => (
+            <li key={g.slug} className="flex flex-col gap-1 p-4 sm:flex-row sm:items-baseline sm:justify-between">
+              <div className="min-w-0">
+                <p className="flex flex-wrap items-center gap-2 font-semibold">
+                  <Link href={`/guides/${g.slug}`} className="hover:text-forest">
+                    {g.title}
+                  </Link>
+                  {g.needsAttorneyReview && <span className="rounded-full bg-warm/15 px-2 py-0.5 text-[12px] font-semibold text-ink">Needs attorney review</span>}
+                  {g.audience === "buyer" && <span className="rounded-full bg-surface px-2 py-0.5 text-[12px] text-muted">Buyer</span>}
+                </p>
+                <p className="text-[14px] text-muted">content/guides/{market.slug}/{g.slug}.md</p>
+              </div>
+              <span className="shrink-0 text-[13px] text-muted">Updated {g.updatedAt}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <EmptyState title="No guides in this market" />
+      )}
     </div>
   );
 }

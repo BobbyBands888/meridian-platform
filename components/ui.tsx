@@ -59,6 +59,12 @@ export function Spinner({ className = "" }: { className?: string }) {
   );
 }
 
+/** Shared calculator styling (the commission calculator and the buyer cost calculator). */
+export const calculatorCardClass = "rounded-3xl border border-line p-6 sm:p-10";
+export const rangeInputClass =
+  "h-2 w-full cursor-pointer appearance-none rounded-full bg-line accent-forest focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-forest";
+export const resultTileClass = "rounded-2xl bg-surface p-5";
+
 export function PageHeader({ title, intro, children }: { title: string; intro?: ReactNode; children?: ReactNode }) {
   return (
     <div className="mx-auto max-w-6xl px-4 pb-10 pt-12 sm:px-6 sm:pt-16">

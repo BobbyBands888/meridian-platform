@@ -67,6 +67,16 @@ export function marketDescription(market: Pick<Market, "slug" | "name" | "state_
     : `${brandName(market)} is launching soon: free listings for selling without an agent in ${market.name}, ${market.state_code}, plus vetted local pros.`;
 }
 
+/**
+ * Markets where the buyer pages (/buy, the buyer and moved-in checklists, the cost calculator) are on. They also need the
+ * market to be live. Everywhere else those pages 404 and the header's "Buy" link goes to /homes.
+ */
+const BUYER_FEATURE_MARKETS: Record<string, true> = {
+  nashville: true,
+};
+
+export const hasBuyerFeatures = (market: Pick<Market, "slug" | "status">) => isLive(market) && BUYER_FEATURE_MARKETS[market.slug] === true;
+
 /** What copy calls a market's whole service area, where it has a name wider than its city and region. */
 const SERVICE_AREA_NAMES: Record<string, string> = {
   nashville: "Greater Nashville & Middle Tennessee",

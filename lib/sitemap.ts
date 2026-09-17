@@ -9,7 +9,7 @@ export type SitemapEntry = {
  * Last-modified date for pages whose content is written in code (home, /sell, /vendors, /guides, area pages, the hub, ...).
  * Bump it whenever that static page copy changes. Pages backed by records use the records' own dates instead.
  */
-export const SITE_CONTENT_UPDATED_AT = "2026-09-16";
+export const SITE_CONTENT_UPDATED_AT = "2026-09-17";
 
 /** SITE_CONTENT_UPDATED_AT as a Date. */
 export const siteContentDate = () => new Date(`${SITE_CONTENT_UPDATED_AT}T12:00:00Z`);

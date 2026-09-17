@@ -5,7 +5,7 @@ import { ButtonLink, Container } from "@/components/ui";
 import { getCurrentProfile, getCurrentUser, isProfileComplete } from "@/lib/auth";
 import { requireMarket } from "@/lib/market-data";
 import { brandName, countyList, isLive } from "@/lib/markets";
-import { VENDOR_CATEGORY_LIMIT_NOTE } from "@/lib/site";
+import { VENDOR_CATEGORY_LIMIT_NOTE, vendorCategories } from "@/lib/site";
 import { createClient } from "@/lib/supabase/server";
 import { categoryByValue } from "@/lib/vendors";
 import { joinVendorDirectory } from "./actions";
@@ -21,15 +21,19 @@ export async function generateMetadata({ params }: PageProps<"/[market]/vendors/
   };
 }
 
-export default async function JoinPage({ params }: PageProps<"/[market]/vendors/join">) {
+export default async function JoinPage({ params, searchParams }: PageProps<"/[market]/vendors/join">) {
   const market = await requireMarket((await params).market);
+  // "Join free" links from empty vendor modules pre-select their category.
+  const requested = (await searchParams).category;
+  const category = vendorCategories.find((c) => c.value === requested)?.value ?? "";
+  const joinPath = category ? `/vendors/join?category=${category}` : "/vendors/join";
   const live = isLive(market);
   const brand = brandName(market);
   const user = await getCurrentUser();
 
   if (user) {
     const profile = await getCurrentProfile();
-    if (!isProfileComplete(profile)) redirect("/welcome?next=/vendors/join");
+    if (!isProfileComplete(profile)) redirect(`/welcome?next=${encodeURIComponent(joinPath)}`);
     const supabase = await createClient();
     const { data: vendor } = await supabase.from("vendors").select("id").eq("profile_id", user.id).maybeSingle();
     if (vendor) redirect("/dashboard/vendor");
@@ -70,7 +74,7 @@ export default async function JoinPage({ params }: PageProps<"/[market]/vendors/
               userId={user.id}
               action={joinVendorDirectory}
               submitLabel={live ? "Submit for review" : "Pre-register for launch"}
-              initial={{ business_name: "", category: "", headshot_url: "", bio: "", service_area: "", price_range: "", website: "", certifications: [] }}
+              initial={{ business_name: "", category, headshot_url: "", bio: "", service_area: "", price_range: "", website: "", certifications: [] }}
             />
           </div>
         ) : (
@@ -80,7 +84,7 @@ export default async function JoinPage({ params }: PageProps<"/[market]/vendors/
               We&apos;ll email you a sign-in link. Then add your business details, a headshot, and confirm five quick
               certifications. {live ? "We review every profile, usually within 24 hours." : "We review every profile before launch."}
             </p>
-            <ButtonLink href="/sign-in?next=/vendors/join" className="mt-5">
+            <ButtonLink href={`/sign-in?next=${encodeURIComponent(joinPath)}`} className="mt-5">
               Sign in to join
             </ButtonLink>
           </div>

@@ -67,7 +67,7 @@ function guideForDay(day: number, guides: GuideMeta[]): GuideMeta | null {
 
 function categoryForSection(section: ChecklistSection, active: VendorCategoryValue[]): VendorCategoryValue | null {
   const mentioned = section.steps.flatMap((step) => step.categories);
-  return mentioned.find((c) => active.includes(c)) ?? null;
+  return (mentioned.find((c) => (active as string[]).includes(c)) as VendorCategoryValue | undefined) ?? null;
 }
 
 export type Lesson = { day: number; subject: string; heading: string; blocks: EmailBlock[] };

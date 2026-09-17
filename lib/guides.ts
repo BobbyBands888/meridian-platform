@@ -16,6 +16,10 @@ export type GuideMeta = {
   vendorCategories: VendorCategoryValue[];
   /** Optional role for linking from other pages. "disclosure" is the market's seller disclosure guide. */
   topic: string | null;
+  /** "buyer" for buyer guides: leads from their vendor cards are tagged buyer_guide. */
+  audience: "buyer" | "seller" | null;
+  /** True while the guide is waiting on attorney review (front matter `attorneyReview: needed`). Shown in the admin. */
+  needsAttorneyReview: boolean;
   readingMinutes: number;
 };
 
@@ -84,6 +88,8 @@ async function loadGuide(market: string, slug: string): Promise<Guide | null> {
     updatedAt: str("updatedAt") || str("publishedAt"),
     vendorCategories: categories,
     topic: str("topic") || null,
+    audience: str("audience") === "buyer" ? "buyer" : str("audience") === "seller" ? "seller" : null,
+    needsAttorneyReview: str("attorneyReview") === "needed",
     readingMinutes: Math.max(1, Math.round(words / 230)),
     html: await marked.parse(body),
   };
@@ -110,6 +116,8 @@ export const getGuides = cache(async (market: string): Promise<GuideMeta[]> => {
       updatedAt: g.updatedAt,
       vendorCategories: g.vendorCategories,
       topic: g.topic,
+      audience: g.audience,
+      needsAttorneyReview: g.needsAttorneyReview,
       readingMinutes: g.readingMinutes,
     }))
     .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt) || a.title.localeCompare(b.title));

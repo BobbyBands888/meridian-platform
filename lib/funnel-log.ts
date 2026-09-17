@@ -1,8 +1,11 @@
 import "server-only";
+import type { FunnelEventName } from "@/lib/database.types";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-export const FUNNEL_EVENTS = ["form_start", "contact_saved", "address_done", "photos_done", "submitted", "email_verified"] as const;
-export type FunnelEventName = (typeof FUNNEL_EVENTS)[number];
+export type { FunnelEventName } from "@/lib/database.types";
+
+/** Buyer tool events the browser reports, each once per browser (see components/buyer-tracking.ts). */
+export const BUYER_TOOL_EVENTS = ["buyer_checklist_start", "moved_in_start", "calculator_use"] as const satisfies readonly FunnelEventName[];
 
 /** "?s=" value as stored: lowercase letters, digits, dashes, underscores, or "direct". */
 export const funnelSource = (value: unknown) => {
@@ -11,12 +14,12 @@ export const funnelSource = (value: unknown) => {
 };
 
 /**
- * Records one step of the seller listing funnel. With a draft, each step counts once per draft (a unique index
- * drops repeats). Never throws: losing an analytics row must not break the seller's flow.
+ * Records one funnel event: a step of the seller listing funnel, or a buyer tool use. With a draft, each step counts once
+ * per draft (a unique index drops repeats). Never throws: losing an analytics row must not break the visitor's flow.
  */
-export async function logFunnelEvent(marketId: string, event: FunnelEventName, source: unknown, draftId?: string | null) {
+export async function logFunnelEvent(marketId: string, event: FunnelEventName, source: unknown, draftId?: string | null, firstSource?: string | null) {
   const { error } = await createAdminClient()
     .from("funnel_events")
-    .insert({ market_id: marketId, event, source: funnelSource(source), draft_id: draftId ?? null });
+    .insert({ market_id: marketId, event, source: funnelSource(source), draft_id: draftId ?? null, ...(firstSource ? { first_source: firstSource } : {}) });
   if (error && error.code !== "23505") console.error("funnel event log failed", event, error.code, error.message);
 }

@@ -1,12 +1,21 @@
 import { PhotoCard } from "@/components/photo-card";
 import { ButtonLink } from "@/components/ui";
+import { withSource, type PageSource } from "@/lib/attribution";
 import type { PublicVendor } from "@/lib/database.types";
 import type { Market } from "@/lib/markets";
 import { verifiedBadgeText } from "@/lib/verification";
 import { categoryByValue, firstSentence, vendorPath } from "@/lib/vendors";
 
-export function VendorCard({ market, vendor, priority }: { market: Pick<Market, "name" | "timezone">; vendor: PublicVendor; priority?: boolean }) {
-  const href = vendorPath(vendor);
+type Props = {
+  market: Pick<Market, "name" | "timezone">;
+  vendor: PublicVendor;
+  priority?: boolean;
+  /** Page source for leads sent from the profile this card links to (?s=). */
+  source?: PageSource;
+};
+
+export function VendorCard({ market, vendor, priority, source }: Props) {
+  const href = withSource(vendorPath(vendor), source);
   return (
     <PhotoCard
       href={href}
@@ -34,7 +43,7 @@ export function VendorCard({ market, vendor, priority }: { market: Pick<Market, 
         ...(vendor.founding_vendor ? ["Founding vendor"] : []),
       ]}
       action={
-        <ButtonLink href={`${href}#contact`} variant="secondary" className="sm:w-full" aria-label={`Contact ${vendor.business_name}`}>
+        <ButtonLink href={withSource(`${vendorPath(vendor)}#contact`, source)} variant="secondary" className="sm:w-full" aria-label={`Contact ${vendor.business_name}`}>
           Contact
         </ButtonLink>
       }
